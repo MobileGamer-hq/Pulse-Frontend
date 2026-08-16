@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/electron-builder.json",
+  "appId": "com.pulse.app",
+  "productName": "Pulse",
+  "copyright": "Copyright © 2026 Pulse Team",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Pulse Engine"
+  }
+}

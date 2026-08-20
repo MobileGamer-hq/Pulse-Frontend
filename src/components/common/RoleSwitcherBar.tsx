@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from './UserAvatar';
 import type { Role } from '../../types';
 import { ShieldCheck, Eye, LogIn, UserPlus, UserCheck, BookOpen, Plus, BellRing } from 'lucide-react';
 import type { ItemType } from './CreateItemModal';
@@ -43,13 +44,13 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
 
         <div className="flex items-center gap-1 overflow-x-auto py-0.5 scrollbar-none">
           {ROLES.map(r => {
-            const isActive = activeRole === r.role && !['signin', 'wizard', 'invite'].includes(activeScreen);
+            const isActive = activeRole === r.role && !['welcome', 'signin', 'wizard', 'invite'].includes(activeScreen);
             return (
               <button
                 key={r.role}
                 onClick={() => {
                   setActiveRole(r.role);
-                  if (['signin', 'wizard', 'invite'].includes(activeScreen)) {
+                  if (['welcome', 'signin', 'wizard', 'invite'].includes(activeScreen)) {
                     setActiveScreen('dashboard');
                   }
                 }}
@@ -67,11 +68,7 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
 
         {/* Current Acting User Pill */}
         <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] font-mono">
-          <img
-            src={currentUser.avatarUrl}
-            alt={currentUser.name}
-            className="w-4 h-4 rounded-full object-cover"
-          />
+          <UserAvatar name={currentUser.name} avatarUrl={currentUser.avatarUrl} size="xs" />
           <span className="text-neutral-200 font-semibold">{currentUser.name}</span>
           <span className="text-neutral-500">({currentUser.title})</span>
         </div>
@@ -117,6 +114,18 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
 
         {/* Setup Screens Quick Nav */}
         <div className="hidden xl:flex items-center gap-1.5">
+          <button
+            onClick={() => setActiveScreen('welcome')}
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 border ${
+              activeScreen === 'welcome'
+                ? 'bg-white text-neutral-900 border-white'
+                : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800'
+            }`}
+          >
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            Welcome
+          </button>
+
           <button
             onClick={() => setActiveScreen('signin')}
             className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 border ${

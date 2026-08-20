@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   ZoomIn, ZoomOut, RotateCcw, Play, Pause, 
-  Sparkles, Link2, Check
+  Zap, Link2, Check
 } from 'lucide-react';
 import type { EntityType, Team, Project, User, Task, Goal, Tag } from '../../types';
 
@@ -104,7 +104,8 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
 
     // Level 1: Projects
     projects.forEach((p: Project, index: number) => {
-      const parentTeamNode = nodesMap.get(`team-${p.teamId}`);
+      const linkedTeamIds = p.teamIds && p.teamIds.length > 0 ? p.teamIds : [p.teamId];
+      const parentTeamNode = nodesMap.get(`team-${linkedTeamIds[0]}`);
       const parentX = parentTeamNode ? parentTeamNode.x : 0;
       const parentY = parentTeamNode ? parentTeamNode.y : 0;
       
@@ -127,14 +128,17 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
         level: 1
       });
 
-      if (parentTeamNode) {
-        edgesList.push({
-          id: `edge-${parentTeamNode.id}-${nodeId}`,
-          source: parentTeamNode.id,
-          target: nodeId,
-          relation: 'has_project'
-        });
-      }
+      linkedTeamIds.forEach(tId => {
+        const teamNode = nodesMap.get(`team-${tId}`);
+        if (teamNode) {
+          edgesList.push({
+            id: `edge-${teamNode.id}-${nodeId}`,
+            source: teamNode.id,
+            target: nodeId,
+            relation: 'has_project'
+          });
+        }
+      });
     });
 
     // Level 2: Users / People
@@ -519,17 +523,21 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
     setIsDragging(false);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    // Pinch-to-zoom on trackpads triggers wheel events with ctrlKey=true
-    if (e.ctrlKey || e.metaKey) {
-      const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
+  // Attach native non-passive wheel listener to prevent browser page/folder view zoom
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const zoomFactor = e.ctrlKey || e.metaKey ? (e.deltaY < 0 ? 1.05 : 0.95) : (e.deltaY < 0 ? 1.08 : 0.92);
       setZoom(z => Math.max(0.2, Math.min(3.0, z * zoomFactor)));
-    } else {
-      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      setZoom(z => Math.max(0.2, Math.min(3.0, z * zoomFactor)));
-    }
-  };
+    };
+
+    el.addEventListener('wheel', onNativeWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onNativeWheel);
+  }, []);
 
   const handleRecenter = () => {
     setZoom(0.85);
@@ -582,7 +590,6 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onWheel={handleWheel}
       className="relative flex-1 w-full h-full bg-[#F4F5F7] dark:bg-[#0A0A0A] text-neutral-900 dark:text-white overflow-hidden select-none cursor-grab active:cursor-grabbing font-sans"
     >
       {/* Dynamic Light/Dark Dotted Grid Background */}
@@ -642,11 +649,11 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
             onClick={() => setShowParticles(!showParticles)}
             className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all ${
               showParticles 
-                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30' 
-                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
+                ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs' 
+                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-black dark:hover:text-white'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Zap className="w-3.5 h-3.5" />
             <span>Energy</span>
           </button>
 
@@ -849,25 +856,10 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
                       className={node.eodStatus === 'blocked' ? 'animate-pulse' : ''}
                     />
 
-                    {node.avatarUrl ? (
-                      <clipPath id={`avatar-clip-${node.id}`}>
-                        <circle r={node.radius} />
-                      </clipPath>
-                    ) : null}
-
-                    {node.avatarUrl ? (
-                      <image
-                        href={node.avatarUrl}
-                        x={-node.radius}
-                        y={-node.radius}
-                        width={node.radius * 2}
-                        height={node.radius * 2}
-                        clipPath={`url(#avatar-clip-${node.id})`}
-                        preserveAspectRatio="xMidYMid slice"
-                      />
-                    ) : (
-                      <circle r={node.radius} fill="#374151" stroke="#FFFFFF" strokeWidth="1.5" />
-                    )}
+                    <circle r={node.radius} fill="#18181B" stroke="#27272A" strokeWidth="1.5" />
+                    <text textAnchor="middle" dy="4" fill="#FFFFFF" fontSize="10" fontWeight="bold" fontFamily="monospace">
+                      {node.label.trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+                    </text>
 
                     {/* External Title & Role Label */}
                     <text textAnchor="middle" dy={node.radius + 16} fill={isDarkMode ? '#F5F5F5' : '#171717'} fontSize="11" fontWeight="bold" fontFamily="sans-serif">
@@ -982,7 +974,7 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
 
         <div className="p-3 rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 shadow-xl backdrop-blur-md space-y-1 pointer-events-auto max-w-xs">
           <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-300">
-            <span>Obsidian Topology</span>
+            <span>Relationship Graph</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-mono">60 FPS</span>
           </div>
           <p className="text-[10px] leading-relaxed opacity-80">

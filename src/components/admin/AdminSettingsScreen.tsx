@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   Building2, Shield, Plug, CreditCard, Tag as TagIcon, 
   Upload, Check, Search, Plus, Edit2, Eye, Slash, 
@@ -647,7 +648,7 @@ export const AdminSettingsScreen: React.FC = () => {
 
                 <div className="flex flex-col sm:flex-row items-start gap-6 pt-2">
                   <div className="space-y-2 text-center">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-20 h-20 rounded-2xl object-cover border border-neutral-200 dark:border-neutral-700 mx-auto" />
+                    <UserAvatar name={fullName} size="xl" className="mx-auto" />
                     <button className="px-3 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-[10px] font-bold">
                       Change Photo
                     </button>

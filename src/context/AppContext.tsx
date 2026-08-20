@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
 import type { 
   User, Role, Tag, Task, Project, Team, EODEntry, Goal, Report, 
   ActivityLog, FilterState, SavedView, DrawerPanel 
@@ -44,9 +45,13 @@ interface AppContextType {
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean) => void;
 
-  // Mobile Menu State
+  // Mobile & Sidebar Menu State
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  isSidebarCollapsed: boolean;
+  setIsSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
+  currentOrgSlug: string;
+  setCurrentOrgSlug: (slug: string) => void;
 
   // Task Filter Bar State
   filters: FilterState;
@@ -59,13 +64,21 @@ interface AppContextType {
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
+  addSubtask: (taskId: string, title: string, assigneeId?: string) => void;
+  updateSubtask: (taskId: string, subtaskId: string, updates: Partial<{ title: string; done: boolean; assigneeId?: string }>) => void;
+  deleteSubtask: (taskId: string, subtaskId: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   addComment: (taskId: string, text: string) => void;
+  updateComment: (taskId: string, commentId: string, text: string) => void;
+  deleteComment: (taskId: string, commentId: string) => void;
   submitEOD: (entry: Omit<EODEntry, 'id' | 'userId' | 'userName' | 'userAvatar' | 'userRole' | 'teamId' | 'teamName'>) => void;
   addTag: (tag: Omit<Tag, 'id'>) => void;
   updateTag: (tagId: string, updates: Partial<Tag>) => void;
   addProject: (project: Omit<Project, 'id'>) => void;
+  updateProject: (projectId: string, updates: Partial<Project>) => void;
+  deleteProject: (projectId: string) => void;
   addGoal: (goal: Omit<Goal, 'id'>) => void;
+  updateGoal: (goalId: string, updates: Partial<Goal>) => void;
   addUser: (user: Omit<User, 'id'>) => void;
   addTeam: (team: Omit<Team, 'id' | 'orgId'>) => void;
   reorderTasks: (newTasks: Task[]) => void;
@@ -110,13 +123,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [eodEntries, setEodEntries] = useState<EODEntry[]>(INITIAL_EOD_ENTRIES);
   const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
-  const [reports] = useState<Report[]>(INITIAL_REPORTS);
+  const [reports, setReports] = useState<Report[]>(INITIAL_REPORTS);
   const [activities, setActivities] = useState<ActivityLog[]>(INITIAL_ACTIVITIES);
+
+  // Sync data with Spring Boot REST Backend on initialization
+  useEffect(() => {
+    async function syncBackendData() {
+      try {
+        const [remoteTasks, remoteProjects, remoteGoals, remoteTags, remotePulse, remoteTeams, remoteUsers, remoteReports] = await Promise.allSettled([
+          api.getTasks(),
+          api.getProjects(),
+          api.getGoals(),
+          api.getTags(),
+          api.getPulseEntries(),
+          api.getTeams(),
+          api.getUsers(),
+          api.getReports()
+        ]);
+
+        if (remoteTasks.status === 'fulfilled' && Array.isArray(remoteTasks.value?.tasks)) {
+          setTasks(remoteTasks.value.tasks);
+        } else if (remoteTasks.status === 'fulfilled' && Array.isArray(remoteTasks.value)) {
+          setTasks(remoteTasks.value);
+        }
+
+        if (remoteProjects.status === 'fulfilled' && Array.isArray(remoteProjects.value)) {
+          setProjects(remoteProjects.value);
+        }
+        if (remoteGoals.status === 'fulfilled' && Array.isArray(remoteGoals.value)) {
+          setGoals(remoteGoals.value);
+        }
+        if (remoteTags.status === 'fulfilled' && Array.isArray(remoteTags.value)) {
+          setTags(remoteTags.value);
+        }
+        if (remotePulse.status === 'fulfilled' && Array.isArray(remotePulse.value)) {
+          setEodEntries(remotePulse.value);
+        }
+        if (remoteTeams.status === 'fulfilled' && Array.isArray(remoteTeams.value)) {
+          setTeams(remoteTeams.value);
+        }
+        if (remoteUsers.status === 'fulfilled' && Array.isArray(remoteUsers.value)) {
+          setUsers(remoteUsers.value);
+          if (remoteUsers.value.length > 0) {
+            setCurrentUser(remoteUsers.value[0]);
+          }
+        }
+        if (remoteReports.status === 'fulfilled' && Array.isArray(remoteReports.value)) {
+          setReports(remoteReports.value);
+        }
+      } catch (err) {
+        // Fallback gracefully
+      }
+    }
+    syncBackendData();
+  }, []);
 
   const [activeScreen, setActiveScreen] = useState<string>('dashboard');
   const [panelStack, setPanelStack] = useState<DrawerPanel[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [currentOrgSlug, setCurrentOrgSlug] = useState<string>('epicordia');
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [savedViews, setSavedViews] = useState<SavedView[]>([
@@ -229,6 +296,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPanelStack(prev => prev.filter(p => !(p.type === 'task' && p.id === taskId)));
   };
 
+  const addSubtask = (taskId: string, title: string, assigneeId?: string) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task;
+      const newSt = { id: `sub-${Date.now()}-${Math.floor(Math.random()*1000)}`, title, done: false, assigneeId };
+      return { ...task, subtasks: [...task.subtasks, newSt], updatedAt: new Date().toISOString() };
+    }));
+  };
+
+  const updateSubtask = (taskId: string, subtaskId: string, updates: Partial<{ title: string; done: boolean; assigneeId?: string }>) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task;
+      const updatedSubtasks = task.subtasks.map(st => st.id === subtaskId ? { ...st, ...updates } : st);
+      return { ...task, subtasks: updatedSubtasks, updatedAt: new Date().toISOString() };
+    }));
+  };
+
+  const deleteSubtask = (taskId: string, subtaskId: string) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id !== taskId) return task;
+      return { ...task, subtasks: task.subtasks.filter(st => st.id !== subtaskId), updatedAt: new Date().toISOString() };
+    }));
+  };
+
   const toggleSubtask = (taskId: string, subtaskId: string) => {
     setTasks(prev => prev.map(task => {
       if (task.id !== taskId) return task;
@@ -246,6 +336,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString()
     };
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, comments: [...t.comments, commentObj] } : t));
+  };
+
+  const updateComment = (taskId: string, commentId: string, text: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const updatedComments = t.comments.map(c => c.id === commentId ? { ...c, text, updatedAt: new Date().toISOString() } : c);
+      return { ...t, comments: updatedComments };
+    }));
+  };
+
+  const deleteComment = (taskId: string, commentId: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      return { ...t, comments: t.comments.filter(c => c.id !== commentId) };
+    }));
   };
 
   const submitEOD = (entryData: Omit<EODEntry, 'id' | 'userId' | 'userName' | 'userAvatar' | 'userRole' | 'teamId' | 'teamName'>) => {
@@ -289,9 +394,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProjects(prev => [newProject, ...prev]);
   };
 
+  const updateProject = (projectId: string, updates: Partial<Project>) => {
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
+  };
+
+  const deleteProject = (projectId: string) => {
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    setPanelStack(prev => prev.filter(p => !(p.type === 'project' && p.id === projectId)));
+  };
+
   const addGoal = (goalData: Omit<Goal, 'id'>) => {
     const newGoal: Goal = { ...goalData, id: `goal-${Date.now()}` };
     setGoals(prev => [newGoal, ...prev]);
+  };
+
+  const updateGoal = (goalId: string, updates: Partial<Goal>) => {
+    setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...updates } : g));
   };
 
   const addUser = (userData: Omit<User, 'id'>) => {
@@ -344,6 +462,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         isMobileMenuOpen,
         setIsMobileMenuOpen,
+        isSidebarCollapsed,
+        setIsSidebarCollapsed,
+        currentOrgSlug,
+        setCurrentOrgSlug,
 
         filters,
         setFilters,
@@ -354,13 +476,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTask,
         updateTask,
         deleteTask,
+        addSubtask,
+        updateSubtask,
+        deleteSubtask,
         toggleSubtask,
         addComment,
+        updateComment,
+        deleteComment,
         submitEOD,
         addTag,
         updateTag,
         addProject,
+        updateProject,
+        deleteProject,
         addGoal,
+        updateGoal,
         addUser,
         addTeam,
         reorderTasks,

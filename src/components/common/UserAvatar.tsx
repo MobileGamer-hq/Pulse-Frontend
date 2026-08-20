@@ -12,14 +12,22 @@ interface UserAvatarProps {
 }
 
 const PRESET_COLORS = [
-  '#0F1115', // Dark Mono
-  '#2563EB', // Electric Blue
-  '#059669', // Emerald
-  '#D97706', // Amber
-  '#7C3AED', // Violet
-  '#DB2777', // Rose
   '#4F46E5', // Indigo
+  '#7C3AED', // Violet
+  '#EC4899', // Pink
+  '#F43F5E', // Rose
+  '#EF4444', // Red
+  '#EA580C', // Orange
+  '#D97706', // Amber
+  '#059669', // Emerald
+  '#0D9488', // Teal
   '#0891B2', // Cyan
+  '#0284C7', // Sky
+  '#2563EB', // Blue
+  '#18181B', // Dark Zinc
+  '#1E293B', // Dark Slate
+  '#312E81', // Dark Indigo
+  '#831843', // Deep Pink
 ];
 
 // Helper to deterministically generate a color based on user name string
@@ -49,7 +57,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const initials = name
-    ? name.trim().split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase()
+    ? name.trim().split(/\s+/).map(part => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
     : 'U';
 
   const sizeClasses = {
@@ -67,7 +75,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     setShowColorPicker(false);
   };
 
-  const hasValidImage = Boolean(avatarUrl && avatarUrl.trim() !== '' && !imgError);
+  const isExternalPhoto = Boolean(avatarUrl && avatarUrl.includes('images.unsplash.com'));
+  const hasValidImage = Boolean(avatarUrl && avatarUrl.trim() !== '' && !imgError && !isExternalPhoto);
 
   return (
     <div className="relative inline-block shrink-0">

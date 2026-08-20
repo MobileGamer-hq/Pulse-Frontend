@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from './UserAvatar';
 import type { EntityType } from '../../types';
 import { 
-  User as UserIcon, FolderGit2, Target, 
+  FolderGit2, Target, 
   Users, AlertCircle, CheckCircle2, Clock, ShieldAlert, ArrowRight 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,11 +73,7 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
         style={type === 'tag' && tag ? { backgroundColor: tag.bgHex, color: tag.textHex, borderColor: 'transparent' } : {}}
       >
         {type === 'person' && (
-          avatarUrl || person?.avatarUrl ? (
-            <img src={avatarUrl || person?.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
-          ) : (
-            <UserIcon className="w-3.5 h-3.5 text-neutral-500" />
-          )
+          <UserAvatar name={label || person?.name || 'User'} avatarUrl={avatarUrl || person?.avatarUrl} size="xs" />
         )}
         {type === 'project' && showIcon && <FolderGit2 className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />}
         {type === 'task' && showIcon && renderStatusIcon(task?.status)}
@@ -106,7 +103,7 @@ export const EntityLink: React.FC<EntityLinkProps> = ({
             {type === 'person' && person && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2.5">
-                  <img src={person.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
+                  <UserAvatar name={person.name} avatarUrl={person.avatarUrl} size="md" />
                   <div>
                     <div className="font-semibold text-neutral-900 dark:text-neutral-100">{person.name}</div>
                     <div className="text-[11px] text-neutral-500">{person.title}</div>

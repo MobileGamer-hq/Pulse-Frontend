@@ -12,19 +12,22 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1 Organization State
-  const [orgName, setOrgName] = useState('Acme Corp');
+  const [orgName, setOrgName] = useState('');
   const [industry, setIndustry] = useState('Technology & Software');
-  const [companySize, setCompanySize] = useState('51 - 200');
+  const [companySize, setCompanySize] = useState('11 - 50');
 
   // Step 2 Team & Template State
-  const [teamName, setTeamName] = useState('Core Engineering');
+  const [teamName, setTeamName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
 
   const handleFinish = () => {
+    const slug = orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'epicordia';
+    localStorage.setItem('pulse_tenant_slug', slug);
+    localStorage.setItem('pulse_auth_token', 'authenticated-user-token');
     if (onComplete) {
       onComplete();
     } else {
-      setActiveScreen('dashboard');
+      window.location.href = `/${slug}/dashboard`;
     }
   };
 
@@ -58,14 +61,25 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
   return (
     <div className="min-h-screen bg-[#F4F5F7] dark:bg-[#0F1115] flex flex-col items-center py-10 px-4 font-sans text-neutral-900 dark:text-neutral-100">
       {/* Header Logo */}
-      <div className="flex items-center gap-2 mb-10">
-        <div className="w-7 h-7 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs shadow-sm">
-          ◇
+      <div className="w-full max-w-2xl flex items-center justify-between mb-8">
+        <button
+          onClick={() => setActiveScreen('welcome')}
+          className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium flex items-center gap-1"
+        >
+          ← Welcome
+        </button>
+
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs shadow-sm">
+            ◇
+          </div>
+          <div>
+            <span className="font-bold text-lg tracking-tight block leading-tight">Pulse</span>
+            <span className="text-[10px] text-neutral-400 font-mono block">by Epicordia</span>
+          </div>
         </div>
-        <div>
-          <span className="font-bold text-lg tracking-tight block leading-tight">Pulse</span>
-          <span className="text-[10px] text-neutral-400 font-mono block">by Epicordia</span>
-        </div>
+
+        <div className="w-16" /> {/* Spacer */}
       </div>
 
       {/* Step Indicator */}

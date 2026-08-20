@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
   CartesianGrid, Tooltip 
@@ -37,7 +38,7 @@ export const GoalsScreen: React.FC = () => {
     quarter: 'Q3 2023',
     title: g.title,
     owner: g.ownerName,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+    avatar: undefined,
     status: g.status === 'OnTrack' ? 'On Track' : g.status === 'AtRisk' ? 'At Risk' : 'Behind',
     krCount: g.keyResults.length,
     progress: g.keyResults.length > 0 ? Math.round(g.keyResults.reduce((acc, kr) => acc + (kr.currentValue / kr.targetValue), 0) / g.keyResults.length * 100) : 50
@@ -48,7 +49,7 @@ export const GoalsScreen: React.FC = () => {
       quarter: 'Q3 2023',
       title: 'Scale Infrastructure for Q4 Growth',
       owner: 'A. Turing',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+      avatar: undefined,
       status: 'On Track',
       krCount: 4,
       progress: 78
@@ -59,7 +60,7 @@ export const GoalsScreen: React.FC = () => {
       quarter: 'Q3 2023',
       title: 'Launch V3 Data Pipeline Integration',
       owner: 'M. Hamilton',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80',
+      avatar: undefined,
       status: 'At Risk',
       krCount: 3,
       progress: 42
@@ -70,7 +71,7 @@ export const GoalsScreen: React.FC = () => {
       quarter: 'Q3 2023',
       title: 'Expand Enterprise Market Penetration',
       owner: 'R. Sales',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
+      avatar: undefined,
       status: 'Behind',
       krCount: 5,
       progress: 15
@@ -422,7 +423,7 @@ export const GoalsScreen: React.FC = () => {
 
               <div className="space-y-3 font-sans">
                 <div className="flex items-center gap-3">
-                  <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-8 h-8 rounded-lg object-cover" />
+                  <UserAvatar name="Elena Rostova" size="sm" />
                   <div>
                     <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Elena Rostova</div>
                     <div className="text-[10px] font-mono text-neutral-400">Objective Owner</div>
@@ -430,7 +431,7 @@ export const GoalsScreen: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80" alt="" className="w-8 h-8 rounded-lg object-cover" />
+                  <UserAvatar name="Alex Chen" size="sm" />
                   <div>
                     <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Alex Chen</div>
                     <div className="text-[10px] font-mono text-neutral-400">Backend Lead</div>
@@ -438,7 +439,7 @@ export const GoalsScreen: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center font-bold text-xs font-mono">SJ</div>
+                  <UserAvatar name="Sarah Jenkins" size="sm" />
                   <div>
                     <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Sarah Jenkins</div>
                     <div className="text-[10px] font-mono text-neutral-400">DevOps</div>

@@ -14,12 +14,14 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   onNavigateToInvite
 }) => {
   const { setActiveScreen } = useApp();
-  const [email, setEmail] = useState('user@example.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.setItem('pulse_auth_token', 'authenticated-user-token');
+    localStorage.setItem('pulse_user_email', email || 'user@company.com');
     if (onSuccess) {
       onSuccess();
     } else {
@@ -139,15 +141,18 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         </div>
 
         {/* Demo Switcher Links */}
-        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between text-[11px] text-neutral-500 font-mono">
+        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center text-[11px] text-neutral-500 font-mono">
+          <button type="button" onClick={() => setActiveScreen('welcome')} className="hover:underline text-black dark:text-white font-semibold">
+            ← Welcome
+          </button>
           {onNavigateToSetup && (
             <button type="button" onClick={onNavigateToSetup} className="hover:underline text-black dark:text-white font-semibold">
-              → Setup Wizard
+              Setup Wizard →
             </button>
           )}
           {onNavigateToInvite && (
             <button type="button" onClick={onNavigateToInvite} className="hover:underline text-black dark:text-white font-semibold">
-              → Invite Flow
+              Invite Flow →
             </button>
           )}
         </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   X, ExternalLink, Folder, Target, Users, ShieldAlert
 } from 'lucide-react';
@@ -158,11 +159,7 @@ export const NodeDetailPopupCard: React.FC<NodeDetailPopupCardProps> = ({
         {entityType === 'person' && userData && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <img
-                src={userData.avatarUrl}
-                alt={userData.name}
-                className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500"
-              />
+              <UserAvatar name={userData.name} avatarUrl={userData.avatarUrl} size="lg" />
               <div>
                 <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">{userData.name}</h3>
                 <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono block">{userData.title}</span>

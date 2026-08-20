@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { Search, UserPlus, Trash2, Eye, Users } from 'lucide-react';
 import type { User } from '../../types';
 
@@ -112,7 +113,7 @@ export const TeamScreen: React.FC = () => {
                 <div key={u.id} className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/40 space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-2">
-                      <img src={u.avatarUrl} alt={u.name} className="w-5 h-5 rounded-full object-cover" />
+                      <UserAvatar name={u.name} avatarUrl={u.avatarUrl} size="xs" />
                       <span className="font-bold text-neutral-900 dark:text-neutral-100">{u.name}</span>
                     </div>
                     <span className="text-[10px] text-neutral-400">Today</span>
@@ -173,7 +174,7 @@ export const TeamScreen: React.FC = () => {
                           className="flex items-center gap-2.5 cursor-pointer"
                           onClick={() => pushPanel({ type: 'person', id: m.id })}
                         >
-                          <img src={m.avatarUrl} alt={m.name} className="w-7 h-7 rounded-full object-cover border border-neutral-200 dark:border-neutral-700" />
+                          <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
                           <div>
                             <div className="font-bold text-xs">{m.name}</div>
                             <div className="text-[10px] text-neutral-400 font-normal">{m.email}</div>

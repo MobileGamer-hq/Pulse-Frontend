@@ -101,7 +101,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-eng',
     teamName: 'Core Engineering',
     title: 'Engineering Manager',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-1', 'proj-2'],
     capacityHoursPerWeek: 40
   },
@@ -114,7 +114,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-eng',
     teamName: 'Core Engineering',
     title: 'Senior Backend Engineer',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-1'],
     capacityHoursPerWeek: 40
   },
@@ -127,7 +127,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-design',
     teamName: 'Product Design',
     title: 'Lead Product Designer',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-2', 'proj-3'],
     capacityHoursPerWeek: 40
   },
@@ -140,7 +140,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-eng',
     teamName: 'Core Engineering',
     title: 'Frontend Engineer',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-2', 'proj-3'],
     capacityHoursPerWeek: 40
   },
@@ -153,7 +153,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-exec',
     teamName: 'Executive Leadership',
     title: 'VP of Product',
-    avatarUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-3', 'proj-4'],
     capacityHoursPerWeek: 40
   },
@@ -166,7 +166,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-mktg',
     teamName: 'Marketing Ops',
     title: 'Marketing Operations Manager',
-    avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-4'],
     capacityHoursPerWeek: 40
   },
@@ -179,7 +179,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-mktg',
     teamName: 'Marketing Ops',
     title: 'Growth Specialist (Contractor)',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     isContractor: true,
     activeProjectIds: ['proj-4'],
     capacityHoursPerWeek: 25
@@ -193,7 +193,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-exec',
     teamName: 'Executive Leadership',
     title: 'Chief Technology Officer',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: ['proj-1', 'proj-2'],
     capacityHoursPerWeek: 40
   },
@@ -206,7 +206,7 @@ export const INITIAL_USERS: User[] = [
     teamId: 'team-exec',
     teamName: 'People & Operations',
     title: 'People & Culture Director',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    avatarUrl: undefined,
     activeProjectIds: [],
     capacityHoursPerWeek: 40
   }
@@ -382,7 +382,7 @@ export const INITIAL_TASKS: Task[] = [
       { id: 'sub-7', title: 'Deploy pgbouncer transaction pool config', done: false }
     ],
     comments: [
-      { id: 'c-4', authorId: 'user-2', authorName: 'Alex Chen', text: 'Flagged to Amaka — need DevOps assistance for pgbouncer staging deployment.', createdAt: '2026-08-11T10:45:00Z' }
+      { id: 'c-4', authorId: 'user-2', authorName: 'Alex Chen', text: 'Flagged to Amaka: need DevOps assistance for pgbouncer staging deployment.', createdAt: '2026-08-11T10:45:00Z' }
     ],
     createdAt: '2026-08-10T11:00:00Z',
     updatedAt: '2026-08-11T11:15:00Z'
@@ -500,7 +500,7 @@ export const INITIAL_EOD_ENTRIES: EODEntry[] = [
     id: 'eod-1',
     userId: 'user-2',
     userName: 'Alex Chen',
-    userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    userAvatar: undefined,
     userRole: 'Member',
     teamId: 'team-eng',
     teamName: 'Core Engineering',
@@ -519,7 +519,7 @@ export const INITIAL_EOD_ENTRIES: EODEntry[] = [
     id: 'eod-2',
     userId: 'user-4',
     userName: 'Marcus Vance',
-    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    userAvatar: undefined,
     userRole: 'Member',
     teamId: 'team-eng',
     teamName: 'Core Engineering',
@@ -537,7 +537,7 @@ export const INITIAL_EOD_ENTRIES: EODEntry[] = [
     id: 'eod-3',
     userId: 'user-3',
     userName: 'Elena Rostova',
-    userAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    userAvatar: undefined,
     userRole: 'TeamLead',
     teamId: 'team-design',
     teamName: 'Product Design',
@@ -555,7 +555,7 @@ export const INITIAL_EOD_ENTRIES: EODEntry[] = [
     id: 'eod-4',
     userId: 'user-7',
     userName: 'Jordan Smith',
-    userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    userAvatar: undefined,
     userRole: 'Contractor',
     teamId: 'team-mktg',
     teamName: 'Marketing Ops',

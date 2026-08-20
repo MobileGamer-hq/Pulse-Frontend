@@ -26,7 +26,7 @@ export interface User {
   teamId: string;
   teamName: string;
   title: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   isContractor?: boolean;
   activeProjectIds: string[];
   capacityHoursPerWeek: number;
@@ -72,8 +72,8 @@ export interface Task {
   linkedGoalId?: string;
   dependencyTaskIds: string[];
   blockedReason?: string;
-  subtasks: { id: string; title: string; done: boolean }[];
-  comments: { id: string; authorId: string; authorName: string; text: string; createdAt: string }[];
+  subtasks: { id: string; title: string; done: boolean; assigneeId?: string }[];
+  comments: { id: string; authorId: string; authorName: string; text: string; createdAt: string; updatedAt?: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -82,7 +82,7 @@ export interface EODEntry {
   id: string;
   userId: string;
   userName: string;
-  userAvatar: string;
+  userAvatar?: string;
   userRole: Role;
   teamId: string;
   teamName: string;
@@ -126,6 +126,7 @@ export interface Project {
   description: string;
   templateType: WorkflowTemplate;
   teamId: string;
+  teamIds?: string[]; // Multi-team project connections
   leadId: string;
   memberIds: string[];
   tagIds: string[];

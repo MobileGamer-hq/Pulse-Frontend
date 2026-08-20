@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   CheckSquare, FolderKanban, Users, Target, 
   Pencil, Plus, Filter, ChevronDown 
@@ -198,7 +199,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
 
             <div className="space-y-2.5 font-sans">
               <div className="flex items-center gap-2.5">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-6 h-6 rounded-full object-cover" />
+                <UserAvatar name="Sarah Jenkins" size="xs" />
                 <div>
                   <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Sarah Jenkins</div>
                   <div className="text-[10px] font-mono text-neutral-400">Lead Architect</div>
@@ -206,7 +207,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
               </div>
 
               <div className="flex items-center gap-2.5">
-                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80" alt="" className="w-6 h-6 rounded-full object-cover" />
+                <UserAvatar name="Michael Torres" size="xs" />
                 <div>
                   <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Michael Torres</div>
                   <div className="text-[10px] font-mono text-neutral-400">DevOps</div>
@@ -214,7 +215,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
               </div>
 
               <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center font-mono font-bold text-[10px]">AL</div>
+                <UserAvatar name="Amanda Lee" size="xs" />
                 <div>
                   <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Amanda Lee</div>
                   <div className="text-[10px] font-mono text-neutral-400">DBA</div>
@@ -244,8 +245,8 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
             <div className="flex justify-between items-center">
               <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Project Phoenix</h4>
               <div className="flex items-center -space-x-1">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-4 h-4 rounded-full object-cover" />
-                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80" alt="" className="w-4 h-4 rounded-full object-cover" />
+                <UserAvatar name="Sarah Jenkins" size="xs" />
+                <UserAvatar name="Michael Torres" size="xs" />
               </div>
             </div>
             <p className="text-[10px] text-neutral-400 font-sans">Core Monolith Disaggregation</p>
@@ -266,7 +267,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
           >
             <div className="flex justify-between items-center">
               <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Global CDN Rollout</h4>
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80" alt="" className="w-4 h-4 rounded-full object-cover" />
+              <UserAvatar name="Elena Rostova" size="xs" />
             </div>
             <p className="text-[10px] text-neutral-400 font-sans">Edge computing initiative</p>
             <div className="space-y-1">

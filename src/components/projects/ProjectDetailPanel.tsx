@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   X, Plus, Network, UserPlus, 
   ArrowRight 
@@ -15,9 +16,9 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
   const project = projects.find(p => p.id === id) || projects[0];
 
   const [scopedTasks, setScopedTasks] = useState([
-    { id: 'TSK-892', title: 'Audit existing sync protocols', date: 'Oct 10', done: true, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
-    { id: 'TSK-895', title: 'Identify international node bottlenecks', date: 'Oct 15', done: true, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
-    { id: 'TSK-899', title: 'Draft new schema architecture', date: 'Oct 20', done: true, tags: ['Backend', 'Architecture'], avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
+    { id: 'TSK-892', title: 'Audit existing sync protocols', date: 'Oct 10', done: true, avatar: undefined },
+    { id: 'TSK-895', title: 'Identify international node bottlenecks', date: 'Oct 15', done: true, avatar: undefined },
+    { id: 'TSK-899', title: 'Draft new schema architecture', date: 'Oct 20', done: true, tags: ['Backend', 'Architecture'], avatar: undefined },
     { id: 'TSK-901', title: 'Implement pilot deployment on Node A', date: 'Nov 01', done: false },
     { id: 'TSK-905', title: 'Load testing and QA validation', date: 'Nov 10', done: false }
   ]);
@@ -201,7 +202,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
               <div className="space-y-2.5 font-sans">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2.5">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-6 h-6 rounded-full object-cover" />
+                    <UserAvatar name="Sarah Jenkins" size="xs" />
                     <div>
                       <div className="font-bold text-neutral-900 dark:text-neutral-100">Sarah Jenkins</div>
                       <div className="text-[10px] font-mono text-neutral-400">Lead Architect</div>
@@ -211,7 +212,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
                 </div>
 
                 <div className="flex items-center gap-2.5 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center font-mono font-bold text-[10px]">JS</div>
+                  <UserAvatar name="James Smith" size="xs" />
                   <div>
                     <div className="font-bold text-neutral-900 dark:text-neutral-100">James Smith</div>
                     <div className="text-[10px] font-mono text-neutral-400">Backend Dev</div>
@@ -219,7 +220,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
                 </div>
 
                 <div className="flex items-center gap-2.5 text-xs">
-                  <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80" alt="" className="w-6 h-6 rounded-full object-cover" />
+                  <UserAvatar name="Elena Rodriguez" size="xs" />
                   <div>
                     <div className="font-bold text-neutral-900 dark:text-neutral-100">Elena Rodriguez</div>
                     <div className="text-[10px] font-mono text-neutral-400">Data Engineer</div>

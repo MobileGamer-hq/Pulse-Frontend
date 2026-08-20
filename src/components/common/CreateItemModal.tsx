@@ -34,6 +34,9 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('Todo');
   const [taskEstimatedHours, setTaskEstimatedHours] = useState<number>(8);
   const [taskAssigneeId, setTaskAssigneeId] = useState<string>(currentUser.id);
+  const [taskSubtasks, setTaskSubtasks] = useState<{ title: string; assigneeId?: string }[]>([]);
+  const [newModalSubtaskTitle, setNewModalSubtaskTitle] = useState('');
+  const [newModalSubtaskAssigneeId, setNewModalSubtaskAssigneeId] = useState('');
 
   // Project state
   const [projectName, setProjectName] = useState('');
@@ -140,7 +143,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         startDate: '2026-08-16',
         tagIds: ['tag-1'],
         dependencyTaskIds: [],
-        subtasks: [],
+        subtasks: taskSubtasks.map((st, idx) => ({
+          id: `sub-${Date.now()}-${idx}`,
+          title: st.title,
+          done: false,
+          assigneeId: st.assigneeId
+        })),
         comments: []
       });
       setSuccessMessage(`Task "${taskTitle}" created successfully under privilege ${activeRole}!`);
@@ -203,7 +211,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         teamId: memberTeamId,
         teamName: team ? team.name : 'Core Team',
         title: memberTitle || `${memberRole} Specialist`,
-        avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+        avatarUrl: undefined,
         activeProjectIds: [],
         capacityHoursPerWeek: 40
       });
@@ -428,12 +436,85 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Description</label>
                       <textarea
-                        rows={3}
+                        rows={2}
                         value={taskDescription}
                         onChange={e => setTaskDescription(e.target.value)}
                         placeholder="Provide details and acceptance criteria..."
                         className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none"
                       />
+                    </div>
+
+                    {/* Initial Subtasks breakdown section */}
+                    <div className="space-y-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Subtasks Breakdown (Optional)
+                      </label>
+
+                      {taskSubtasks.length > 0 && (
+                        <div className="space-y-1.5 mb-2">
+                          {taskSubtasks.map((st, idx) => {
+                            const subAssignee = users.find(u => u.id === st.assigneeId);
+                            return (
+                              <div key={idx} className="flex items-center justify-between p-2 rounded bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-mono">
+                                <span className="text-neutral-800 dark:text-neutral-200 font-medium">{st.title}</span>
+                                <div className="flex items-center gap-2">
+                                  {subAssignee ? (
+                                    <span className="text-[10px] text-neutral-500">→ {subAssignee.name}</span>
+                                  ) : (
+                                    <span className="text-[10px] text-neutral-400">Unassigned</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setTaskSubtasks(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-neutral-400 hover:text-red-600 font-bold ml-1"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newModalSubtaskTitle}
+                          onChange={e => setNewModalSubtaskTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (!newModalSubtaskTitle.trim()) return;
+                              setTaskSubtasks(prev => [...prev, { title: newModalSubtaskTitle.trim(), assigneeId: newModalSubtaskAssigneeId || undefined }]);
+                              setNewModalSubtaskTitle('');
+                            }
+                          }}
+                          placeholder="Add subtask title..."
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono focus:outline-none"
+                        />
+                        <select
+                          value={newModalSubtaskAssigneeId}
+                          onChange={e => setNewModalSubtaskAssigneeId(e.target.value)}
+                          className="px-2 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                        >
+                          <option value="">Assignee (Optional)</option>
+                          {users.map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newModalSubtaskTitle.trim()) return;
+                            setTaskSubtasks(prev => [...prev, { title: newModalSubtaskTitle.trim(), assigneeId: newModalSubtaskAssigneeId || undefined }]);
+                            setNewModalSubtaskTitle('');
+                          }}
+                          className="px-3 py-1.5 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 font-mono text-xs font-bold rounded-lg hover:bg-neutral-300"
+                        >
+                          + Add
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}

@@ -1,0 +1,6 @@
+-let the side bar be collapsable 
+-let the folder sidebar in relationships be collapsable
+-The app is looking like a single page website, i would like it to use routing and it works like this
+the site pulse.com/organization_name/... then the pagess, the task and etc how a professional website would works
+-exporting data as pdf, excel, csv
+-If the user doesnt have an profile picture use their initials with a random background color

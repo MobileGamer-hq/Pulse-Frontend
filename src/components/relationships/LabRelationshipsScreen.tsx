@@ -1,35 +1,25 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
-import { SpiderWebCanvas } from './SpiderWebCanvas';
+import { LabGraphCanvas } from './LabGraphCanvas';
 import { NodeDetailPopupCard } from './NodeDetailPopupCard';
 import { 
-  Search, ShieldAlert, Target, 
-  ChevronRight, ExternalLink, ArrowLeft, Network
+  Search, ChevronRight, ExternalLink, ArrowLeft, FlaskConical
 } from 'lucide-react';
-import type { EntityType } from '../../types';
 
-export const RelationshipsScreen: React.FC = () => {
-  const { setActiveScreen, pushPanel, projects, tasks, goals } = useApp();
+export const LabRelationshipsScreen: React.FC = () => {
+  const { setActiveScreen, pushPanel, projects } = useApp();
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
-  const [isFolderSidebarCollapsed, setIsFolderSidebarCollapsed] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>('proj-proj-1');
+  const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([
+    'team-team-eng',
+    'proj-proj-1',
+    'proj-proj-2'
+  ]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSelectNode = (id: string, type?: EntityType, fromCanvas = false) => {
+  const handleSelectNode = (id: string) => {
     setSelectedNodeId(id);
-
-    if (fromCanvas && type) {
-      if (type === 'project') {
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${id}`])));
-      } else if (type === 'task') {
-        const taskObj = tasks.find(t => t.id === id);
-        if (taskObj) {
-          setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${taskObj.projectId}`])));
-        }
-      }
-    }
   };
 
   const handleToggleFolder = (id: string) => {
@@ -61,31 +51,11 @@ export const RelationshipsScreen: React.FC = () => {
     }
   };
 
-  const handlePresetFocus = (preset: 'all' | 'projects' | 'blocked' | 'goals') => {
-    if (preset === 'all') {
-      setSelectedNodeId(null);
-    } else if (preset === 'projects') {
-      if (projects.length > 0) {
-        const pId = projects[0].id;
-        setSelectedNodeId(`proj-${pId}`);
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${pId}`])));
-      }
-    } else if (preset === 'blocked') {
-      const blockedTask = tasks.find(t => t.status === 'Blocked');
-      if (blockedTask) {
-        setSelectedNodeId(`task-${blockedTask.id}`);
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${blockedTask.projectId}`])));
-      }
-    } else if (preset === 'goals') {
-      if (goals.length > 0) setSelectedNodeId(`goal-${goals[0].id}`);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 w-screen h-screen bg-[#F4F5F7] dark:bg-neutral-950 flex flex-col font-sans overflow-hidden">
-      {/* Top Header Bar with Prominent Back to Dashboard Button */}
+      {/* Top Header Bar with Prominent Back to Dashboard Button & Lab Badge */}
       <div className="h-14 px-4 sm:px-6 bg-white/90 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4 shrink-0 font-mono text-xs text-neutral-900 dark:text-neutral-100 backdrop-blur-md">
-        {/* Left: Back Button & Breadcrumbs */}
+        {/* Left: Back Button, Lab Badge & Breadcrumbs */}
         <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveScreen('dashboard')}
@@ -97,14 +67,16 @@ export const RelationshipsScreen: React.FC = () => {
 
           <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
 
-          <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white shrink-0">
-            <Network className="w-3.5 h-3.5 text-neutral-400" />
-            <span>Spider Web Relationships</span>
+          {/* Lab Badge */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 font-bold shrink-0">
+            <FlaskConical className="w-3.5 h-3.5" />
+            <span>Lab: Graph Creator</span>
           </div>
+
           <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
 
           <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold truncate max-w-[200px]">
-            {selectedNodeId ? selectedNodeId : 'Concentric Radial Map'}
+            {selectedNodeId ? selectedNodeId : 'Global Interactive Canvas'}
           </span>
         </div>
 
@@ -115,40 +87,13 @@ export const RelationshipsScreen: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search relationship nodes..."
+            placeholder="Search canvas nodes..."
             className="w-full pl-8 pr-4 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
           />
         </div>
 
-        {/* Right Action Shortcuts */}
+        {/* Right Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden lg:flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-1 rounded-xl">
-            <button
-              onClick={() => handlePresetFocus('all')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold"
-            >
-              All
-            </button>
-            <button
-              onClick={() => handlePresetFocus('projects')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold"
-            >
-              Projects
-            </button>
-            <button
-              onClick={() => handlePresetFocus('blocked')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-red-600 dark:text-red-400 hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold flex items-center gap-1"
-            >
-              <ShieldAlert className="w-3 h-3" /> Blockers
-            </button>
-            <button
-              onClick={() => handlePresetFocus('goals')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-purple-600 dark:text-purple-400 hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold flex items-center gap-1"
-            >
-              <Target className="w-3 h-3" /> OKRs
-            </button>
-          </div>
-
           {selectedNodeId && (
             <button
               onClick={handleOpenDetailDrawer}
@@ -165,16 +110,14 @@ export const RelationshipsScreen: React.FC = () => {
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <StackedFolderSidebar
           selectedNodeId={selectedNodeId}
-          onSelectNode={(id, type) => handleSelectNode(id, type, false)}
+          onSelectNode={handleSelectNode}
           expandedFolderIds={expandedFolderIds}
           onToggleFolder={handleToggleFolder}
-          isCollapsed={isFolderSidebarCollapsed}
-          onToggleCollapse={() => setIsFolderSidebarCollapsed(prev => !prev)}
         />
 
-        <SpiderWebCanvas
+        <LabGraphCanvas
           selectedNodeId={selectedNodeId}
-          onSelectNode={(id) => handleSelectNode(id, undefined, true)}
+          onSelectNode={handleSelectNode}
           searchQuery={searchQuery}
         />
 

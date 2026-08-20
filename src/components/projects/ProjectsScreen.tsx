@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
+import { ExportDropdown } from '../common/ExportDropdown';
 import { 
   Search, Plus, LayoutGrid, List, ChevronDown, 
   Target, CheckCircle2, GripVertical 
@@ -21,7 +23,7 @@ export const ProjectsScreen: React.FC = () => {
     name: p.name,
     status: p.status,
     progress: p.status === 'Completed' ? 100 : p.status === 'Active' ? 68 : 12,
-    avatars: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80'],
+    avatars: ['Sarah Jenkins', 'Alex Chen'],
     extraAvatars: 2,
     targetCount: 2,
     doneCount: 8
@@ -32,7 +34,7 @@ export const ProjectsScreen: React.FC = () => {
       name: 'Q3 Architecture Refactor',
       status: 'Active',
       progress: 68,
-      avatars: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80'],
+      avatars: ['Sarah Jenkins', 'Alex Chen'],
       extraAvatars: 3,
       targetCount: 2,
       doneCount: 14
@@ -43,7 +45,7 @@ export const ProjectsScreen: React.FC = () => {
       name: 'Data Pipeline Optimization',
       status: 'Planning',
       progress: 12,
-      avatars: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80'],
+      avatars: ['Elena Rostova'],
       extraAvatars: 0,
       targetCount: 1,
       doneCount: 4
@@ -54,7 +56,7 @@ export const ProjectsScreen: React.FC = () => {
       name: 'Legacy System Audit',
       status: 'Completed',
       progress: 100,
-      avatars: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80'],
+      avatars: ['Marcus Vance'],
       extraAvatars: 1,
       targetCount: 3,
       doneCount: 0
@@ -102,13 +104,26 @@ export const ProjectsScreen: React.FC = () => {
           <p className="text-xs text-neutral-500 font-mono mt-0.5">Active monitoring of 24 concurrent initiatives.</p>
         </div>
 
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'project' } }))}
-          className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Create Project
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportDropdown
+            filename="pulse_projects_export"
+            title="Pulse Project Roster Report"
+            data={filteredProjects.map(p => ({
+              Code: p.code,
+              Name: p.name,
+              Status: p.status,
+              Progress: `${p.progress}%`,
+              TasksDone: p.doneCount
+            }))}
+          />
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'project' } }))}
+            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create Project
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar Controls matching Screenshot 2 */}
@@ -241,8 +256,8 @@ export const ProjectsScreen: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800">
                   <div className="flex items-center -space-x-1.5">
-                    {prj.avatars.map((av, i) => (
-                      <img key={i} src={av} alt="" className="w-5 h-5 rounded-full object-cover border border-white dark:border-neutral-900" />
+                    {prj.avatars.map((name, i) => (
+                      <UserAvatar key={i} name={name} size="xs" />
                     ))}
                     {prj.extraAvatars > 0 && (
                       <span className="w-5 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-white dark:border-neutral-900 flex items-center justify-center text-[8px] font-bold text-neutral-600 dark:text-neutral-400">

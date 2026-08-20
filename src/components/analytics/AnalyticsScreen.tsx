@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { UserAvatar } from '../common/UserAvatar';
+import { ExportDropdown } from '../common/ExportDropdown';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
   CartesianGrid, Tooltip, ScatterChart, Scatter, ZAxis, 
@@ -140,12 +142,16 @@ export const AnalyticsScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 font-mono">
-          <button
-            onClick={handleExport}
-            className="px-3.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold flex items-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" /> Export
-          </button>
+          <ExportDropdown
+            filename="pulse_analytics_export"
+            title="Pulse Performance Analytics Report"
+            data={[
+              { Metric: '30-Day Output Velocity', Value: '48 pts/sprint', Change: '+14%' },
+              { Metric: 'Average Energy Index', Value: '4.2 / 5.0', Change: '+0.4' },
+              { Metric: 'Triage Turnaround Time', Value: '1.4 Days', Change: '-22%' },
+              { Metric: 'EOD Check-in Consistency', Value: '94%', Change: '+6%' }
+            ]}
+          />
         </div>
       </div>
 
@@ -193,7 +199,7 @@ export const AnalyticsScreen: React.FC = () => {
                 <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">94.2</span>
                 <span className="text-xs text-neutral-500">%</span>
               </div>
-              <span className="text-[10px] text-neutral-400 block">— Steady trend</span>
+              <span className="text-[10px] text-neutral-400 block">Steady trend</span>
             </div>
 
             <div className="p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2">
@@ -504,11 +510,7 @@ export const AnalyticsScreen: React.FC = () => {
 
             <div className="space-y-6">
               <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-start gap-3">
-                <img 
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" 
-                  alt="" 
-                  className="w-10 h-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-700" 
-                />
+                <UserAvatar name="Sarah Jenkins" size="lg" />
                 <div className="space-y-1 font-sans">
                   <h4 className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Sarah Jenkins</h4>
                   <span className="text-[9px] font-mono uppercase text-neutral-400 block">LEAD ENGINEER, PLATFORM</span>

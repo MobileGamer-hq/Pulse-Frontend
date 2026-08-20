@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
+
 const DAILY_THROUGHPUT_DATA = [
   { day: 'Mon', throughput: 40 },
   { day: 'Tue', throughput: 65 },
@@ -55,9 +57,32 @@ export const ReportsScreen: React.FC = () => {
     return true;
   });
 
-  const handleDownloadBrief = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert(`Downloading ${docFormat.toUpperCase()} report with corporate branding: ${corporateBranding ? 'ON' : 'OFF'}`);
+  const handleDownloadBrief = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    const columns = [
+      { header: 'Metric / Item', key: 'metric' },
+      { header: 'Category', key: 'category' },
+      { header: 'Value / Status', key: 'value' },
+      { header: 'Period', key: 'period' }
+    ];
+    const data = [
+      { metric: 'Total Effort', category: 'Executive Summary', value: '842 Hours (+5.2% vs W41)', period: `${startDate} to ${endDate}` },
+      { metric: 'Story Points Delivered', category: 'Executive Summary', value: '112 Points', period: `${startDate} to ${endDate}` },
+      { metric: 'Bug Triage Rate', category: 'Executive Summary', value: '24 Resolved (-12%)', period: `${startDate} to ${endDate}` },
+      { metric: 'Deployed v2.4 Core Refactor', category: 'Accomplishments', value: 'Merged to Master (0 Incidents)', period: 'Week 42' },
+      { metric: 'QA Staging Instability', category: 'Blockers & Risks', value: 'High Severity', period: 'Ongoing' }
+    ];
+
+    const fileName = `Pulse_Performance_Report_${startDate}_${endDate}`;
+    if (docFormat === 'pdf') {
+      exportToPDF(fileName, 'Weekly Executive Performance Brief', data, columns);
+    } else if (docFormat === 'csv') {
+      exportToCSV(fileName, data, columns);
+    } else {
+      exportToExcel(fileName, data, columns);
+    }
+
     setShowExportDrawer(false);
   };
 

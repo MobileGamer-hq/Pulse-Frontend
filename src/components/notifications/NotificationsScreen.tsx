@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   AlertTriangle, UserCheck, AtSign, FileText, 
   MoreVertical, Check, ArrowLeft, FolderKanban, Target, MessageSquare, ExternalLink, Network
@@ -310,7 +311,7 @@ export const NotificationsScreen: React.FC = () => {
               <div className="space-y-3 font-sans border-b border-neutral-100 dark:border-neutral-800 pb-3">
                 {activityLogs.map(log => (
                   <div key={log.id} className="flex items-start gap-3">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80" alt="" className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5" />
+                    <UserAvatar name={log.user} size="xs" className="mt-0.5" />
                     <div className="space-y-0.5 flex-1">
                       <div className="flex justify-between items-center text-xs font-bold text-neutral-900 dark:text-neutral-100">
                         <span>{log.user}</span>

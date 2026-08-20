@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { EntityLink } from './EntityLink';
-import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Monitor } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
+import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { isElectron } from '../../utils/platform';
 
 export const Header: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     setIsSearchOpen, isDarkMode, setIsDarkMode, currentUser, 
-    eodEntries, tasks, pushPanel, setActiveScreen, setIsMobileMenuOpen 
+    currentOrgSlug, eodEntries, tasks, pushPanel, setActiveScreen, setIsMobileMenuOpen 
   } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const blockedTasks = tasks.filter(t => t.status === 'Blocked');
   const flaggedEods = eodEntries.filter(e => e.flaggedToManager);
-  const inElectron = isElectron();
 
   return (
     <header className="h-14 bg-[#F4F5F7] dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-6 flex items-center justify-between shrink-0 font-sans gap-2 select-none">
@@ -28,17 +29,19 @@ export const Header: React.FC = () => {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveScreen('dashboard')}>
-          <span className="w-5 h-5 rounded bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold text-[10px]">◇</span>
+        <div 
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+          onClick={() => navigate('/select-org')}
+          title="Click to switch organization workspace"
+        >
+          <span className="w-5 h-5 rounded bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold text-[10px] shadow-xs">◇</span>
           <div className="flex items-center gap-2">
-            <h2 className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 tracking-tight leading-none">Pulse Core</h2>
-            {inElectron ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[9px] font-medium">
-                <Monitor className="w-2.5 h-2.5" /> Desktop
-              </span>
-            ) : (
-              <span className="text-[9px] text-neutral-400 font-mono hidden xs:inline">by Epicordia</span>
-            )}
+            <h2 className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 tracking-tight leading-none capitalize">
+              {currentOrgSlug || 'Epicordia'}
+            </h2>
+            <span className="text-[9px] text-neutral-400 font-mono hidden xs:inline flex items-center gap-0.5">
+              <Building2 className="w-2.5 h-2.5 opacity-60" /> Switch
+            </span>
           </div>
         </div>
       </div>
@@ -163,11 +166,11 @@ export const Header: React.FC = () => {
 
         {/* User Profile Avatar Pill */}
         <div className="pl-1 sm:pl-2 border-l border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
-          <img
-            src={currentUser.avatarUrl}
-            alt={currentUser.name}
+          <UserAvatar
+            name={currentUser.name}
+            avatarUrl={currentUser.avatarUrl}
+            size="sm"
             onClick={() => pushPanel({ type: 'person', id: currentUser.id })}
-            className="w-7 h-7 rounded-full object-cover border border-neutral-300 dark:border-neutral-700 cursor-pointer"
           />
         </div>
       </div>

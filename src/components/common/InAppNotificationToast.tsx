@@ -62,14 +62,7 @@ export const InAppNotificationToast: React.FC = () => {
   const [activeToast, setActiveToast] = useState<ToastAlert | null>(null);
   const [queueIndex, setQueueIndex] = useState(0);
 
-  // Automatically trigger initial toast after 2.5 seconds for seamless demo
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setActiveToast(SAMPLE_ALERTS[0]);
-    }, 2500);
-
-    return () => clearTimeout(timer);
-  }, []);
+  // Toast state initially empty for real user usage
 
   // Listen for custom trigger events from anywhere in the app
   useEffect(() => {

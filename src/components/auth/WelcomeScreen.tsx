@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, Shield, Activity, Layers, 
   LogIn, ChevronRight
@@ -16,6 +17,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onSignIn,
   onInvite
 }) => {
+  const navigate = useNavigate();
   const { setActiveScreen } = useApp();
   const [quickName, setQuickName] = useState('');
   const [quickEmail, setQuickEmail] = useState('');
@@ -26,7 +28,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     if (onStartSetup) {
       onStartSetup();
     } else {
-      setActiveScreen('wizard');
+      navigate('/register');
     }
   };
 
@@ -34,7 +36,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     if (onSignIn) {
       onSignIn();
     } else {
-      setActiveScreen('signin');
+      navigate('/login');
     }
   };
 
@@ -42,7 +44,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     if (onInvite) {
       onInvite();
     } else {
-      setActiveScreen('invite');
+      navigate('/invite/demo');
     }
   };
 
@@ -66,26 +68,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         </div>
 
         <nav className="hidden md:flex items-center gap-6 font-mono text-xs text-neutral-700 dark:text-neutral-300 font-semibold">
-          <button onClick={() => scrollToSection('features')} className="hover:text-black dark:hover:text-white transition-colors">
+          <button onClick={() => scrollToSection('features')} className="hover:text-black dark:hover:text-white transition-colors cursor-pointer">
             Capabilities
           </button>
-          <button onClick={() => scrollToSection('setup')} className="hover:text-black dark:hover:text-white transition-colors">
+          <button onClick={() => scrollToSection('setup')} className="hover:text-black dark:hover:text-white transition-colors cursor-pointer">
             Workspace Setup
-          </button>
-          <button onClick={handleInvite} className="hover:text-black dark:hover:text-white transition-colors">
-            Team Invite
           </button>
           <div className="h-4 w-px bg-neutral-300 dark:bg-neutral-700 mx-1" />
           <button
             onClick={handleSignIn}
-            className="px-3.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 hover:border-black dark:hover:border-white transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 hover:border-black dark:hover:border-white transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </button>
           <button
             onClick={() => handleStartSetup()}
-            className="px-3.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-black font-bold hover:opacity-90 transition-opacity"
+            className="px-3.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-black font-bold hover:opacity-90 transition-opacity cursor-pointer"
           >
             Get Started
           </button>
@@ -251,8 +250,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <div className="lg:col-span-5 flex justify-center lg:justify-end">
             <div className="w-full max-w-md bg-white dark:bg-neutral-950 p-6 sm:p-8 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
               <div className="space-y-1">
-                <div className="font-bold text-base text-neutral-900 dark:text-white">Initialize New Workspace</div>
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">Enter your basic details to start the onboarding wizard.</div>
+                <div className="font-bold text-base text-neutral-900 dark:text-white">Create Your Account</div>
+                <div className="text-xs text-neutral-600 dark:text-neutral-400">Register your user account to access or launch workspaces.</div>
               </div>
 
               <form onSubmit={handleStartSetup} className="space-y-4 font-mono text-xs">
@@ -298,7 +297,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   type="submit"
                   className="w-full py-2.5 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
                 >
-                  <span>Continue to Wizard</span>
+                  <span>Register Account</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </form>

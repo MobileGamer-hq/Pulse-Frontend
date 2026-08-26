@@ -4,7 +4,7 @@ import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { 
   Search, Plus, LayoutGrid, List, ChevronDown, 
-  Target, CheckCircle2, GripVertical 
+  Target, CheckCircle2, GripVertical, FolderGit2 
 } from 'lucide-react';
 
 export const ProjectsScreen: React.FC = () => {
@@ -17,51 +17,17 @@ export const ProjectsScreen: React.FC = () => {
   const [ownerFilter, setOwnerFilter] = useState('All');
 
   // Convert AppContext projects or default projects list
-  const INITIAL_PROJECT_ITEMS = projects.length > 0 ? projects.map(p => ({
+  const INITIAL_PROJECT_ITEMS = projects.map(p => ({
     id: p.id,
     code: p.id.toUpperCase(),
     name: p.name,
     status: p.status,
     progress: p.status === 'Completed' ? 100 : p.status === 'Active' ? 68 : 12,
-    avatars: ['Sarah Jenkins', 'Alex Chen'],
-    extraAvatars: 2,
-    targetCount: 2,
-    doneCount: 8
-  })) : [
-    {
-      id: 'PRJ-092',
-      code: 'PRJ-092',
-      name: 'Q3 Architecture Refactor',
-      status: 'Active',
-      progress: 68,
-      avatars: ['Sarah Jenkins', 'Alex Chen'],
-      extraAvatars: 3,
-      targetCount: 2,
-      doneCount: 14
-    },
-    {
-      id: 'PRJ-104',
-      code: 'PRJ-104',
-      name: 'Data Pipeline Optimization',
-      status: 'Planning',
-      progress: 12,
-      avatars: ['Elena Rostova'],
-      extraAvatars: 0,
-      targetCount: 1,
-      doneCount: 4
-    },
-    {
-      id: 'PRJ-088',
-      code: 'PRJ-088',
-      name: 'Legacy System Audit',
-      status: 'Completed',
-      progress: 100,
-      avatars: ['Marcus Vance'],
-      extraAvatars: 1,
-      targetCount: 3,
-      doneCount: 0
-    }
-  ];
+    avatars: [],
+    extraAvatars: 0,
+    targetCount: 0,
+    doneCount: 0
+  }));
 
   const [projectItems, setProjectItems] = useState(INITIAL_PROJECT_ITEMS);
   const [draggedPrjId, setDraggedPrjId] = useState<string | null>(null);
@@ -195,8 +161,27 @@ export const ProjectsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid View of Projects matching Screenshot 2 */}
-      {viewMode === 'grid' ? (
+      {/* Grid / List View or Empty State */}
+      {filteredProjects.length === 0 ? (
+        <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-xs">
+          <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+            <FolderGit2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">No Projects Found</h3>
+            <p className="text-xs text-neutral-500 font-mono max-w-sm mx-auto">
+              {searchQuery ? `No projects match "${searchQuery}".` : 'Your workspace has no active projects yet. Click below to create your first project.'}
+            </p>
+          </div>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'project' } }))}
+            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            Create Project
+          </button>
+        </div>
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
           {filteredProjects.map(prj => {
             const isDragging = draggedPrjId === prj.id;

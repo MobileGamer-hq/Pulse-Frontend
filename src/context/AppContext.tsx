@@ -1,13 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
 import type { 
   User, Role, Tag, Task, Project, Team, EODEntry, Goal, Report, 
-  ActivityLog, FilterState, SavedView, DrawerPanel 
+  ActivityLog, FilterState, SavedView, DrawerPanel, Organization
 } from '../types';
-import { 
-  INITIAL_USERS, INITIAL_TEAMS, INITIAL_TAGS, INITIAL_PROJECTS, INITIAL_TASKS, 
-  INITIAL_EOD_ENTRIES, INITIAL_GOALS, INITIAL_REPORTS, INITIAL_ACTIVITIES 
-} from '../data/mockData';
 
 interface AppContextType {
   // Current session & RBAC
@@ -52,6 +47,9 @@ interface AppContextType {
   setIsSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
   currentOrgSlug: string;
   setCurrentOrgSlug: (slug: string) => void;
+  userOrgs: Organization[];
+  addOrg: (org: Organization) => void;
+  updateOrgMemberStatus: (slug: string, role: Role | 'Pending Role Assignment', status: 'APPROVED' | 'PENDING' | 'REJECTED') => void;
 
   // Task Filter Bar State
   filters: FilterState;
@@ -100,11 +98,47 @@ const DEFAULT_FILTERS: FilterState = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const getInitialOrgs = (): Organization[] => {
+  const isNew = localStorage.getItem('pulse_is_new_user') === 'true';
+  const stored = localStorage.getItem('pulse_user_orgs');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+  if (isNew) return [];
+  return [
+    {
+      id: 'org-epicordia',
+      name: 'Epicordia Technologies',
+      slug: 'epicordia',
+      role: 'Admin',
+      status: 'APPROVED',
+      membersCount: 24,
+      activeProjects: 5
+    }
+  ];
+};
+
+const getInitialUser = (): User => ({
+  id: localStorage.getItem('pulse_user_id') || 'usr-active',
+  orgId: localStorage.getItem('pulse_tenant_slug') || 'epicordia',
+  name: localStorage.getItem('pulse_user_name') || 'Active User',
+  email: localStorage.getItem('pulse_user_email') || 'user@company.com',
+  role: 'Admin',
+  teamId: 'team-main',
+  teamName: 'Core Operations',
+  title: 'Workspace Admin',
+  capacityHoursPerWeek: 40,
+  activeProjectIds: []
+});
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]); // Amaka Okafor (Manager)
-  const [activeRole, setActiveRoleState] = useState<Role>('Manager');
+  const [users, setUsers] = useState<User[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [currentUser, setCurrentUser] = useState<User>(getInitialUser());
+  const [activeRole, setActiveRoleState] = useState<Role>('Admin');
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
@@ -118,65 +152,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [isDarkMode]);
 
-  const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [eodEntries, setEodEntries] = useState<EODEntry[]>(INITIAL_EOD_ENTRIES);
-  const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
-  const [reports, setReports] = useState<Report[]>(INITIAL_REPORTS);
-  const [activities, setActivities] = useState<ActivityLog[]>(INITIAL_ACTIVITIES);
-
-  // Sync data with Spring Boot REST Backend on initialization
-  useEffect(() => {
-    async function syncBackendData() {
-      try {
-        const [remoteTasks, remoteProjects, remoteGoals, remoteTags, remotePulse, remoteTeams, remoteUsers, remoteReports] = await Promise.allSettled([
-          api.getTasks(),
-          api.getProjects(),
-          api.getGoals(),
-          api.getTags(),
-          api.getPulseEntries(),
-          api.getTeams(),
-          api.getUsers(),
-          api.getReports()
-        ]);
-
-        if (remoteTasks.status === 'fulfilled' && Array.isArray(remoteTasks.value?.tasks)) {
-          setTasks(remoteTasks.value.tasks);
-        } else if (remoteTasks.status === 'fulfilled' && Array.isArray(remoteTasks.value)) {
-          setTasks(remoteTasks.value);
-        }
-
-        if (remoteProjects.status === 'fulfilled' && Array.isArray(remoteProjects.value)) {
-          setProjects(remoteProjects.value);
-        }
-        if (remoteGoals.status === 'fulfilled' && Array.isArray(remoteGoals.value)) {
-          setGoals(remoteGoals.value);
-        }
-        if (remoteTags.status === 'fulfilled' && Array.isArray(remoteTags.value)) {
-          setTags(remoteTags.value);
-        }
-        if (remotePulse.status === 'fulfilled' && Array.isArray(remotePulse.value)) {
-          setEodEntries(remotePulse.value);
-        }
-        if (remoteTeams.status === 'fulfilled' && Array.isArray(remoteTeams.value)) {
-          setTeams(remoteTeams.value);
-        }
-        if (remoteUsers.status === 'fulfilled' && Array.isArray(remoteUsers.value)) {
-          setUsers(remoteUsers.value);
-          if (remoteUsers.value.length > 0) {
-            setCurrentUser(remoteUsers.value[0]);
-          }
-        }
-        if (remoteReports.status === 'fulfilled' && Array.isArray(remoteReports.value)) {
-          setReports(remoteReports.value);
-        }
-      } catch (err) {
-        // Fallback gracefully
-      }
-    }
-    syncBackendData();
-  }, []);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [eodEntries, setEodEntries] = useState<EODEntry[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [reports] = useState<Report[]>([]);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
 
   const [activeScreen, setActiveScreen] = useState<string>('dashboard');
   const [panelStack, setPanelStack] = useState<DrawerPanel[]>([]);
@@ -184,6 +166,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [currentOrgSlug, setCurrentOrgSlug] = useState<string>('epicordia');
+  const [userOrgs, setUserOrgs] = useState<Organization[]>(getInitialOrgs());
+
+  const addOrg = (org: Organization) => {
+    setUserOrgs(prev => {
+      const existing = prev.find(o => o.slug === org.slug);
+      let next;
+      if (existing) {
+        next = prev.map(o => o.slug === org.slug ? { ...o, ...org } : o);
+      } else {
+        next = [...prev, org];
+      }
+      localStorage.setItem('pulse_user_orgs', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateOrgMemberStatus = (slug: string, role: Role | 'Pending Role Assignment', status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
+    setUserOrgs(prev => {
+      const next = prev.map(o => o.slug === slug ? { ...o, role, status } : o);
+      localStorage.setItem('pulse_user_orgs', JSON.stringify(next));
+      return next;
+    });
+    localStorage.setItem(`pulse_org_status_${slug}`, status);
+    if (role !== 'Pending Role Assignment') {
+      localStorage.setItem(`pulse_user_role_${slug}`, role);
+    }
+  };
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [savedViews, setSavedViews] = useState<SavedView[]>([
@@ -466,6 +475,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsSidebarCollapsed,
         currentOrgSlug,
         setCurrentOrgSlug,
+        userOrgs,
+        addOrg,
+        updateOrgMemberStatus,
 
         filters,
         setFilters,

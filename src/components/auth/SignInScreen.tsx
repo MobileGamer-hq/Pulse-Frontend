@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Key } from 'lucide-react';
+import { Mail, Lock, Key, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 interface SignInScreenProps {
@@ -18,14 +18,42 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('pulse_auth_token', 'authenticated-user-token');
-    localStorage.setItem('pulse_user_email', email || 'user@company.com');
-    if (onSuccess) {
-      onSuccess();
-    } else {
-      setActiveScreen('dashboard');
+    setError(null);
+
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const userName = email.split('@')[0] || 'User';
+      const activeSlug = localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+
+      localStorage.setItem('pulse_auth_token', 'demo-auth-token');
+      localStorage.setItem('pulse_user_id', 'usr-active');
+      localStorage.setItem('pulse_user_email', email);
+      localStorage.setItem('pulse_user_name', userName);
+      localStorage.setItem('pulse_tenant_slug', activeSlug);
+
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.href = '/select-org';
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,11 +128,18 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             </a>
           </div>
 
+          {error && (
+            <div className="p-2 rounded bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-mono text-[11px]">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full py-3 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="w-full py-3 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            Sign In
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
           </button>
         </form>
 

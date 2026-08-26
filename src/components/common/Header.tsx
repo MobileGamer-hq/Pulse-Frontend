@@ -10,7 +10,7 @@ export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { 
     setIsSearchOpen, isDarkMode, setIsDarkMode, currentUser, 
-    currentOrgSlug, eodEntries, tasks, pushPanel, setActiveScreen, setIsMobileMenuOpen 
+    currentOrgSlug, eodEntries, tasks, pushPanel, setActiveScreen, setIsMobileMenuOpen
   } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
 

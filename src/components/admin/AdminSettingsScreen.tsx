@@ -10,7 +10,14 @@ import {
 } from 'lucide-react';
 
 export const AdminSettingsScreen: React.FC = () => {
-  const { setIsDarkMode, pushPanel, tags, reorderTags } = useApp();
+  const { 
+    setIsDarkMode, pushPanel, tags, reorderTags, 
+    currentUser, currentOrgSlug, activeRole 
+  } = useApp();
+
+  const initialEmail = localStorage.getItem('pulse_user_email') || currentUser?.email || 'admin@pulse.app';
+  const initialName = localStorage.getItem('pulse_user_name') || currentUser?.name || 'Workspace Admin';
+  const initialSlug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
 
   // Drag and drop state for Tags tab
   const [draggedTagId, setDraggedTagId] = useState<string | null>(null);
@@ -30,16 +37,16 @@ export const AdminSettingsScreen: React.FC = () => {
     setDragOverTagId(null);
   };
 
-  // Settings Tab: 'user_profile' | 'appearance' | 'notif_controls' | 'profile' | 'rbac' | 'integrations' | 'billing' | 'tags'
+  // Settings Tab
   const [activeTab, setActiveTab] = useState<'user_profile' | 'appearance' | 'notif_controls' | 'profile' | 'rbac' | 'integrations' | 'billing' | 'tags'>('appearance');
 
-  // Appearance Settings State (Screenshot 1)
+  // Appearance Settings State
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('light');
   const [density, setDensity] = useState<'standard' | 'compact'>('standard');
   const [fontSize, setFontSize] = useState('14px');
   const [contrastMode, setContrastMode] = useState(false);
 
-  // Notification Controls State (Screenshot 2)
+  // Notification Controls State
   const [pauseNotifs, setPauseNotifs] = useState(false);
   const [quietMode, setQuietMode] = useState(true);
   const [quietStart, setQuietStart] = useState('10:00 PM');
@@ -49,6 +56,7 @@ export const AdminSettingsScreen: React.FC = () => {
     digests: { email: true, desktop: false, inapp: true },
     marketing: { email: false, desktop: false, inapp: false }
   });
+
   const [triggers, setTriggers] = useState({
     taskAssignments: true,
     mentions: true,
@@ -57,20 +65,34 @@ export const AdminSettingsScreen: React.FC = () => {
     goalUpdates: true
   });
 
-  // Profile & Preferences State (Screenshot 3)
-  const [fullName, setFullName] = useState('Jane Doe');
-  const [emailAddr, setEmailAddr] = useState('jane.doe@enterprise.os');
-  const [jobTitle, setJobTitle] = useState('Senior Data Analyst');
-  const [department, setDepartment] = useState('Analytics & Strategy');
+  // Profile & Preferences State - Dynamic logged in user defaults
+  const [fullName, setFullName] = useState(initialName);
+  const [emailAddr, setEmailAddr] = useState(initialEmail);
+  const [jobTitle, setJobTitle] = useState(currentUser?.title || 'Workspace Administrator');
+  const [department, setDepartment] = useState(currentUser?.teamName || 'Engineering');
   const [deepWorkMode, setDeepWorkMode] = useState(false);
   const [language, setLanguage] = useState('English (US)');
   const [region, setRegion] = useState('North America');
   const [userTimeZone, setUserTimeZone] = useState('(GMT-08:00) Pacific Time');
   const [startOfWeek, setStartOfWeek] = useState<'sunday' | 'monday'>('monday');
 
+  // Sync profile when currentUser or localStorage updates
+  React.useEffect(() => {
+    const savedName = localStorage.getItem('pulse_user_name');
+    const savedEmail = localStorage.getItem('pulse_user_email');
+    if (savedName) setFullName(savedName);
+    else if (currentUser?.name) setFullName(currentUser.name);
+
+    if (savedEmail) setEmailAddr(savedEmail);
+    else if (currentUser?.email) setEmailAddr(currentUser.email);
+
+    if (currentUser?.title) setJobTitle(currentUser.title);
+    if (currentUser?.teamName) setDepartment(currentUser.teamName);
+  }, [currentUser]);
+
   // Tenant Company Profile State
-  const [companyName, setCompanyName] = useState('Acme Corporation');
-  const [tenantDomain, setTenantDomain] = useState('acme');
+  const [companyName, setCompanyName] = useState(initialSlug.charAt(0).toUpperCase() + initialSlug.slice(1));
+  const [tenantDomain, setTenantDomain] = useState(initialSlug);
   const [timeZone, setTimeZone] = useState('PST (Pacific Standard Time)');
   const [currency, setCurrency] = useState('USD ($)');
   const [nomenclature, setNomenclature] = useState<'depts' | 'tribes'>('depts');
@@ -813,16 +835,12 @@ export const AdminSettingsScreen: React.FC = () => {
                   <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-800 flex items-center gap-3">
                     <Laptop className="w-5 h-5 text-neutral-700 dark:text-neutral-300 shrink-0" />
                     <div>
-                      <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">MacBook Pro - Chrome</div>
-                      <div className="text-[10px] font-mono text-neutral-400">San Francisco, US • Current Session</div>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-neutral-50/50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 flex items-center gap-3">
-                    <Smartphone className="w-5 h-5 text-neutral-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">iPhone 13 - iOS App</div>
-                      <div className="text-[10px] font-mono text-neutral-400">San Francisco, US • Last active 2h ago</div>
+                      <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">
+                        {typeof navigator !== 'undefined' && navigator.platform.includes('Win') ? 'Windows PC - Web Browser' : 'Current Device - Web Browser'}
+                      </div>
+                      <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                        • Current Active Session
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1139,12 +1157,8 @@ export const AdminSettingsScreen: React.FC = () => {
                 <h3 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-sans">User Assignments</h3>
                 <div className="space-y-3 font-sans">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold">Jane Doe</span>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">EXECUTIVE</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold">John Smith</span>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">IC</span>
+                    <span className="font-bold">{fullName}</span>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 uppercase">{activeRole || 'ADMIN'}</span>
                   </div>
                 </div>
               </div>

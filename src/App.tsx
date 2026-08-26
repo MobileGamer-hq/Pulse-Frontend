@@ -17,10 +17,14 @@ import { TeamScreen } from './components/team/TeamScreen';
 import { AdminSettingsScreen } from './components/admin/AdminSettingsScreen';
 import { NotificationsScreen } from './components/notifications/NotificationsScreen';
 import { RelationshipsScreen } from './components/relationships/RelationshipsScreen';
+import { WelcomeScreen } from './components/auth/WelcomeScreen';
 import { SignInScreen } from './components/auth/SignInScreen';
-import { OnboardingWizardScreen } from './components/auth/OnboardingWizardScreen';
+import { SignUpScreen } from './components/auth/SignUpScreen';
+import { CreateOrgScreen } from './components/auth/CreateOrgScreen';
+import { JoinOrgScreen } from './components/auth/JoinOrgScreen';
 import { InviteAcceptanceScreen } from './components/auth/InviteAcceptanceScreen';
 import { OrgSwitcherScreen } from './components/auth/OrgSwitcherScreen';
+import { WaitingRoomScreen } from './components/auth/WaitingRoomScreen';
 import { TenantGuard } from './components/auth/TenantGuard';
 import { SlideOverDrawer } from './components/common/SlideOverDrawer';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
@@ -171,31 +175,46 @@ const MainLayout: React.FC = () => {
   );
 };
 
+const RootRedirector: React.FC = () => {
+  const authCookie = localStorage.getItem('pulse_auth_token');
+  if (!authCookie) {
+    return <Navigate to="/welcome" replace />;
+  }
+  return <Navigate to="/select-org" replace />;
+};
+
 export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
         <Routes>
           {/* Public & Global Auth Routes */}
-          <Route path="/" element={<Navigate to="/epicordia/dashboard" replace />} />
+          <Route path="/" element={<RootRedirector />} />
+          <Route path="/welcome" element={<WelcomeScreen />} />
           <Route path="/login" element={
             <SignInScreen
-              onSuccess={() => window.location.href = '/epicordia/dashboard'}
+              onSuccess={() => {
+                window.location.href = '/select-org';
+              }}
               onNavigateToSetup={() => window.location.href = '/register'}
               onNavigateToInvite={() => window.location.href = '/invite/demo'}
             />
           } />
-          <Route path="/register" element={
-            <OnboardingWizardScreen onComplete={() => window.location.href = '/epicordia/dashboard'} />
-          } />
-          <Route path="/invite/:token" element={
-            <InviteAcceptanceScreen onComplete={() => window.location.href = '/epicordia/dashboard'} />
-          } />
+          <Route path="/register" element={<SignUpScreen />} />
           <Route path="/select-org" element={<OrgSwitcherScreen />} />
+          <Route path="/create-org" element={<CreateOrgScreen />} />
+          <Route path="/join-org" element={<JoinOrgScreen />} />
+          <Route path="/invite/:token" element={
+            <InviteAcceptanceScreen onComplete={() => {
+              const slug = localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+              window.location.href = `/${slug}/waiting-room`;
+            }} />
+          } />
 
           {/* Tenant Guarded Routes (/:orgSlug/...) */}
           <Route path="/:orgSlug" element={<TenantGuard><Outlet /></TenantGuard>}>
             <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="waiting-room" element={<WaitingRoomScreen />} />
             <Route path="dashboard" element={<MainLayout />} />
             <Route path="tasks" element={<MainLayout />} />
             <Route path="tasks/:taskId" element={<MainLayout />} />
@@ -213,7 +232,7 @@ export default function App() {
           </Route>
 
           {/* Catch-all fallback */}
-          <Route path="*" element={<Navigate to="/epicordia/dashboard" replace />} />
+          <Route path="*" element={<RootRedirector />} />
         </Routes>
       </AppProvider>
     </BrowserRouter>

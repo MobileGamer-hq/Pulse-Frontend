@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Code, Compass, TrendingUp, LayoutGrid } from 'lucide-react';
+import { Check, Code, Compass, TrendingUp, LayoutGrid, User, Mail, Lock, Building2, Users, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { WorkflowTemplate } from '../../types';
 
@@ -9,25 +9,128 @@ interface OnboardingWizardScreenProps {
 
 export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ onComplete }) => {
   const { setActiveScreen } = useApp();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Step 1 Organization State
+  // Check if user is already logged in
+  const existingUserId = localStorage.getItem('pulse_user_id');
+  const existingEmail = localStorage.getItem('pulse_user_email');
+  const existingName = localStorage.getItem('pulse_user_name');
+
+  // Step 1: User Account Credentials State
+  const [fullName, setFullName] = useState(existingName || '');
+  const [email, setEmail] = useState(existingEmail || '');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Step 2: Organization State
   const [orgName, setOrgName] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
   const [industry, setIndustry] = useState('Technology & Software');
   const [companySize, setCompanySize] = useState('11 - 50');
 
-  // Step 2 Team & Template State
+  // Step 3: Team & Template State
   const [teamName, setTeamName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
 
-  const handleFinish = () => {
-    const slug = orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'epicordia';
-    localStorage.setItem('pulse_tenant_slug', slug);
-    localStorage.setItem('pulse_auth_token', 'authenticated-user-token');
-    if (onComplete) {
-      onComplete();
-    } else {
-      window.location.href = `/${slug}/dashboard`;
+  // Auto-skip Step 1 if user is already authenticated
+  React.useEffect(() => {
+    const token = localStorage.getItem('pulse_auth_token');
+    if (token && existingUserId && step === 1) {
+      setStep(2);
+    }
+  }, []);
+
+  // Handle Step 1: Create Account
+  const handleStep1Next = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (localStorage.getItem('pulse_auth_token') && localStorage.getItem('pulse_user_id')) {
+      setStep(2);
+      return;
+    }
+
+    if (!fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      localStorage.setItem('pulse_auth_token', 'demo-auth-token');
+      localStorage.setItem('pulse_user_id', 'usr-active');
+      localStorage.setItem('pulse_user_email', email);
+      localStorage.setItem('pulse_user_name', fullName);
+
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create user account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Step 2: Create Organization
+  const handleStep2Next = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!orgName.trim()) {
+      setError('Please enter an organization name.');
+      return;
+    }
+    const slug = orgSlug.trim() ? orgSlug.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!slug) {
+      setError('Please enter a valid workspace slug/subdomain.');
+      return;
+    }
+    setOrgSlug(slug);
+
+    setLoading(true);
+    try {
+      localStorage.setItem('pulse_tenant_slug', slug);
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message || 'Failed to set organization.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Step 3 Validation & Team Creation
+  const handleStep3Next = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!teamName.trim()) {
+      setError('Please enter your team name.');
+      return;
+    }
+    setStep(4);
+  };
+
+  // Handle Final Launch & Activation
+  const handleFinish = async () => {
+    setError(null);
+    setLoading(true);
+    const finalSlug = orgSlug || orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'epicordia';
+
+    try {
+      localStorage.setItem('pulse_tenant_slug', finalSlug);
+
+      if (onComplete) {
+        onComplete();
+      } else {
+        window.location.href = `/${finalSlug}/dashboard`;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Workspace launch failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,9 +167,9 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
       <div className="w-full max-w-2xl flex items-center justify-between mb-8">
         <button
           onClick={() => setActiveScreen('welcome')}
-          className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium flex items-center gap-1"
+          className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium flex items-center gap-1 cursor-pointer"
         >
-          ← Welcome
+          ← Welcome Screen
         </button>
 
         <div className="flex items-center gap-2">
@@ -79,11 +182,18 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
           </div>
         </div>
 
-        <div className="w-16" /> {/* Spacer */}
+        <div className="w-20 text-right">
+          <button
+            onClick={() => setActiveScreen('signin')}
+            className="font-mono text-xs text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white underline cursor-pointer"
+          >
+            Sign In
+          </button>
+        </div>
       </div>
 
       {/* Step Indicator */}
-      <div className="w-full max-w-xl mb-8">
+      <div className="w-full max-w-2xl mb-8">
         <div className="flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-2">
             <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold ${
@@ -91,10 +201,10 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
             }`}>
               1
             </span>
-            <span className="font-semibold">Organization</span>
+            <span className="font-semibold hidden sm:inline">Account</span>
           </div>
 
-          <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-4" />
+          <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-2 sm:mx-4" />
 
           <div className="flex items-center gap-2">
             <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold ${
@@ -102,10 +212,10 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
             }`}>
               2
             </span>
-            <span className="font-semibold">Team</span>
+            <span className="font-semibold hidden sm:inline">Organization</span>
           </div>
 
-          <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-4" />
+          <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-2 sm:mx-4" />
 
           <div className="flex items-center gap-2">
             <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold ${
@@ -113,15 +223,127 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
             }`}>
               3
             </span>
-            <span className="font-semibold">Finalize</span>
+            <span className="font-semibold hidden sm:inline">Team</span>
+          </div>
+
+          <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-2 sm:mx-4" />
+
+          <div className="flex items-center gap-2">
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold ${
+              step >= 4 ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-neutral-200 text-neutral-500'
+            }`}>
+              4
+            </span>
+            <span className="font-semibold hidden sm:inline">Finalize</span>
           </div>
         </div>
       </div>
 
-      {/* Step 1: Organization Profile */}
+      {/* Global Error Banner */}
+      {error && (
+        <div className="w-full max-w-2xl mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold text-center">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Step 1: User Account Credentials */}
       {step === 1 && (
-        <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6">
+        <form onSubmit={handleStep1Next} className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6">
           <div>
+            <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 1 of 4</span>
+            <h2 className="text-xl font-bold tracking-tight">Create Administrator Account</h2>
+            <p className="text-xs text-neutral-500 mt-1">Enter your login credentials to set up your personal workspace account.</p>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={e => { setFullName(e.target.value); setError(null); }}
+                  placeholder="e.g. Somto Analyst"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError(null); }}
+                  placeholder="name@company.com"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError(null); }}
+                    placeholder="At least 6 chars"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={e => { setConfirmPassword(e.target.value); setError(null); }}
+                    placeholder="Repeat password"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-end">
+            <button
+              type="submit"
+              className="py-2.5 px-6 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              Continue to Organization →
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Step 2: Organization Profile */}
+      {step === 2 && (
+        <form onSubmit={handleStep2Next} className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6">
+          <div>
+            <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 2 of 4</span>
             <h2 className="text-xl font-bold tracking-tight">Organization Profile</h2>
             <p className="text-xs text-neutral-500 mt-1">Configure the core details of your enterprise workspace.</p>
           </div>
@@ -129,15 +351,40 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
           <div className="space-y-4 text-xs">
             <div>
               <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
-                Organization Name
+                Organization Name <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={orgName}
-                onChange={e => setOrgName(e.target.value)}
-                placeholder="e.g. Acme Corp"
-                className="w-full px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
-              />
+              <div className="relative">
+                <Building2 className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={orgName}
+                  onChange={e => {
+                    setOrgName(e.target.value);
+                    setError(null);
+                    setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                  }}
+                  placeholder="e.g. Epicordia Corp"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
+                Workspace Subdomain (Slug)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  required
+                  value={orgSlug}
+                  onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                  placeholder="epicordia"
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+                />
+                <span className="font-mono text-neutral-400 text-xs">.pulse.app</span>
+              </div>
             </div>
 
             <div>
@@ -149,10 +396,10 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
                 onChange={e => setIndustry(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
               >
-                <option value="Technology & Software">Software & Technology</option>
-                <option value="Marketing & Agency">Marketing & Digital Agency</option>
+                <option value="Technology & Software">Software &amp; Technology</option>
+                <option value="Marketing & Agency">Marketing &amp; Digital Agency</option>
                 <option value="Financial Services">Financial Services</option>
-                <option value="Healthcare & Life Sciences">Healthcare & Life Sciences</option>
+                <option value="Healthcare & Life Sciences">Healthcare &amp; Life Sciences</option>
               </select>
             </div>
 
@@ -179,22 +426,29 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
             </div>
           </div>
 
-          <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-end">
+          <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center">
             <button
-              onClick={() => setStep(2)}
-              className="py-2.5 px-5 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
+              type="button"
+              onClick={() => setStep(1)}
+              className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium cursor-pointer"
             >
-              Continue →
+              ← Back
+            </button>
+            <button
+              type="submit"
+              className="py-2.5 px-6 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            >
+              Continue to Team →
             </button>
           </div>
-        </div>
+        </form>
       )}
 
-      {/* Step 2: Team Configuration */}
-      {step === 2 && (
-        <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6">
+      {/* Step 3: Team Configuration */}
+      {step === 3 && (
+        <form onSubmit={handleStep3Next} className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6">
           <div>
-            <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 2 of 4</span>
+            <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 3 of 4</span>
             <h2 className="text-xl font-bold tracking-tight">Team Configuration</h2>
             <p className="text-xs text-neutral-500 mt-1">Define your first working group and select a foundational workflow template.</p>
           </div>
@@ -202,16 +456,19 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
           <div className="space-y-4 text-xs">
             <div>
               <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
-                Team Name
+                Primary Team Name <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={teamName}
-                onChange={e => setTeamName(e.target.value)}
-                placeholder="e.g. Engineering, Product, Marketing"
-                className="w-full px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
-              />
-              <span className="text-[10px] text-neutral-400 mt-1 block font-mono">This will be the primary workspace for your initial users.</span>
+              <div className="relative">
+                <Users className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={teamName}
+                  onChange={e => { setTeamName(e.target.value); setError(null); }}
+                  placeholder="e.g. Core Engineering, Product Strategy"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+                />
+              </div>
             </div>
 
             <div>
@@ -256,47 +513,67 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
 
           <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center">
             <button
-              onClick={() => setStep(1)}
-              className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium"
+              type="button"
+              onClick={() => setStep(2)}
+              className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white font-medium cursor-pointer"
             >
-              Back
+              ← Back
             </button>
             <button
-              onClick={() => setStep(3)}
-              className="py-2.5 px-5 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity"
+              type="submit"
+              className="py-2.5 px-6 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
             >
-              Continue
+              Review Details →
             </button>
           </div>
-        </div>
+        </form>
       )}
 
-      {/* Step 3: Finalize */}
-      {step === 3 && (
+      {/* Step 4: Finalize & Launch */}
+      {step === 4 && (
         <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6 text-center">
           <div className="w-12 h-12 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 flex items-center justify-center mx-auto text-xl font-bold">
             ✓
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Workspace Ready!</h2>
-            <p className="text-xs text-neutral-500 mt-1">
-              {orgName} is configured with the {selectedTemplate} template for team {teamName}.
-            </p>
+            <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 4 of 4</span>
+            <h2 className="text-xl font-bold tracking-tight">Confirm &amp; Launch Workspace</h2>
+            <p className="text-xs text-neutral-500 mt-1">Review your registration information before launching Pulse.</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-left text-xs font-mono space-y-1">
-            <div>• Organization: <span className="font-semibold text-neutral-900 dark:text-neutral-100">{orgName}</span></div>
-            <div>• Size: <span className="font-semibold text-neutral-900 dark:text-neutral-100">{companySize}</span></div>
-            <div>• Default Team: <span className="font-semibold text-neutral-900 dark:text-neutral-100">{teamName}</span></div>
-            <div>• Workflow: <span className="font-semibold text-neutral-900 dark:text-neutral-100">{selectedTemplate}</span></div>
+          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-left text-xs font-mono space-y-2 border border-neutral-200 dark:border-neutral-700">
+            <div>• Admin User: <span className="font-bold text-neutral-900 dark:text-neutral-100">{fullName} ({email})</span></div>
+            <div>• Organization: <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgName} ({orgSlug}.pulse.app)</span></div>
+            <div>• Size &amp; Industry: <span className="font-bold text-neutral-900 dark:text-neutral-100">{companySize} • {industry}</span></div>
+            <div>• Initial Team: <span className="font-bold text-neutral-900 dark:text-neutral-100">{teamName}</span></div>
+            <div>• Workflow Template: <span className="font-bold text-neutral-900 dark:text-neutral-100">{selectedTemplate}</span></div>
           </div>
 
-          <button
-            onClick={handleFinish}
-            className="w-full py-3 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity"
-          >
-            Launch Pulse Workspace →
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="py-3 px-5 rounded-lg border border-neutral-200 dark:border-neutral-700 font-mono text-xs font-bold text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
+            >
+              ← Back
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleFinish}
+              className="flex-1 py-3 rounded-lg bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Registering Workspace...
+                </>
+              ) : (
+                'Complete Setup & Launch Pulse →'
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>

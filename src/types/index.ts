@@ -189,3 +189,13 @@ export type DrawerPanel =
   | { type: 'goal'; id: string }
   | { type: 'tag'; id: string }
   | { type: 'relationship-map'; projectId: string };
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  role: Role | 'Pending Role Assignment';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  membersCount: number;
+  activeProjects: number;
+}

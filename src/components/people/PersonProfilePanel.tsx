@@ -11,9 +11,22 @@ interface PersonProfilePanelProps {
 }
 
 export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) => {
-  const { users, popPanel, pushPanel } = useApp();
+  const { users, currentUser, popPanel, pushPanel } = useApp();
 
-  const user = users.find(u => u.id === id) || users[0];
+  const fallbackUser = currentUser || {
+    id: id || 'usr-me',
+    orgId: 'epicordia',
+    email: localStorage.getItem('pulse_user_email') || 'admin@pulse.app',
+    name: localStorage.getItem('pulse_user_name') || 'Workspace Admin',
+    role: 'Admin',
+    teamId: 'team-main',
+    teamName: 'Core Operations',
+    title: 'Workspace Administrator',
+    capacityHoursPerWeek: 40,
+    activeProjectIds: []
+  };
+
+  const user = (users && users.find(u => u.id === id)) || (currentUser && (currentUser.id === id || id === 'usr-active') ? currentUser : null) || users?.[0] || fallbackUser;
 
   return (
     <div className="space-y-6 font-sans text-xs">

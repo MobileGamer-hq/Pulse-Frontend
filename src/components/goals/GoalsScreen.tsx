@@ -32,7 +32,7 @@ export const GoalsScreen: React.FC = () => {
   const [startVal, setStartVal] = useState('0');
   const [targetVal, setTargetVal] = useState('100');
 
-  const INITIAL_OBJECTIVES = goals.length > 0 ? goals.map(g => ({
+  const INITIAL_OBJECTIVES = goals.map(g => ({
     id: g.id,
     dept: g.ownerType === 'team' ? 'Engineering' : 'Org',
     quarter: 'Q3 2023',
@@ -41,42 +41,8 @@ export const GoalsScreen: React.FC = () => {
     avatar: undefined,
     status: g.status === 'OnTrack' ? 'On Track' : g.status === 'AtRisk' ? 'At Risk' : 'Behind',
     krCount: g.keyResults.length,
-    progress: g.keyResults.length > 0 ? Math.round(g.keyResults.reduce((acc, kr) => acc + (kr.currentValue / kr.targetValue), 0) / g.keyResults.length * 100) : 50
-  })) : [
-    {
-      id: 'OBJ-Q3-01',
-      dept: 'Engineering',
-      quarter: 'Q3 2023',
-      title: 'Scale Infrastructure for Q4 Growth',
-      owner: 'A. Turing',
-      avatar: undefined,
-      status: 'On Track',
-      krCount: 4,
-      progress: 78
-    },
-    {
-      id: 'OBJ-Q3-02',
-      dept: 'Product',
-      quarter: 'Q3 2023',
-      title: 'Launch V3 Data Pipeline Integration',
-      owner: 'M. Hamilton',
-      avatar: undefined,
-      status: 'At Risk',
-      krCount: 3,
-      progress: 42
-    },
-    {
-      id: 'OBJ-Q3-03',
-      dept: 'Sales',
-      quarter: 'Q3 2023',
-      title: 'Expand Enterprise Market Penetration',
-      owner: 'R. Sales',
-      avatar: undefined,
-      status: 'Behind',
-      krCount: 5,
-      progress: 15
-    }
-  ];
+    progress: g.keyResults.length > 0 ? Math.round(g.keyResults.reduce((acc, kr) => acc + (kr.currentValue / kr.targetValue), 0) / g.keyResults.length * 100) : 0
+  }));
 
   const [objectives, setObjectives] = useState(INITIAL_OBJECTIVES);
   const [draggedObjId, setDraggedObjId] = useState<string | null>(null);
@@ -161,8 +127,28 @@ export const GoalsScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Objective Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
+          {/* Objective Cards Grid or Empty State */}
+          {objectives.length === 0 ? (
+            <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-xs">
+              <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                <Target className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">No Strategic Objectives Found</h3>
+                <p className="text-xs text-neutral-500 font-mono max-w-sm mx-auto">
+                  Your workspace currently has 0 goals tracked in the database. Click below to create your first goal.
+                </p>
+              </div>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'goal' } }))}
+                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Create Goal
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
             {objectives.map(obj => {
               const isDragging = draggedObjId === obj.id;
               const isDragOver = dragOverObjId === obj.id;
@@ -234,8 +220,9 @@ export const GoalsScreen: React.FC = () => {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* 2. OBJECTIVE DETAIL & PROGRESS ROLLUP VIEW matching Screenshot 2 */}
       {viewState === 'detail' && (

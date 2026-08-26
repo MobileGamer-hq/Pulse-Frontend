@@ -4,7 +4,7 @@ import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { 
   List, LayoutGrid, GitCommit, Users, Filter, X, 
-  ChevronDown, ChevronRight, CheckCircle2, 
+  ChevronDown, ChevronRight, CheckCircle2, Plus,
   MessageSquare, Calendar, AlertTriangle, GripVertical 
 } from 'lucide-react';
 import type { TaskStatus } from '../../types';
@@ -278,8 +278,27 @@ export const TasksScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* VIEW MODE 1: LIST VIEW matching Image 1 */}
-      {viewMode === 'list' && (
+      {/* Tasks View Rendering or Actionable Empty State */}
+      {filteredTasks.length === 0 ? (
+        <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-xs">
+          <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">No Tasks Found</h3>
+            <p className="text-xs text-neutral-500 font-mono max-w-sm mx-auto">
+              Your task board has 0 records matching your filters. Click below to add a new task.
+            </p>
+          </div>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'task' } }))}
+            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
+        </div>
+      ) : viewMode === 'list' ? (
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
@@ -417,10 +436,7 @@ export const TasksScreen: React.FC = () => {
             </table>
           </div>
         </div>
-      )}
-
-      {/* VIEW MODE 2: KANBAN BOARD VIEW matching Image 2 */}
-      {viewMode === 'kanban' && (
+      ) : viewMode === 'kanban' ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* Column 1: To Do */}
           <div 
@@ -624,10 +640,7 @@ export const TasksScreen: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* VIEW MODE 3: TIMELINE GANTT VIEW matching Image 3 */}
-      {viewMode === 'timeline' && (
+      ) : viewMode === 'timeline' ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
           <div className="overflow-x-auto relative">
             {/* Red Today Line */}
@@ -691,10 +704,7 @@ export const TasksScreen: React.FC = () => {
             </table>
           </div>
         </div>
-      )}
-
-      {/* VIEW MODE 4: WORKLOAD MATRIX VIEW matching Image 4 */}
-      {viewMode === 'workload' && (
+      ) : viewMode === 'workload' ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4 font-mono">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -764,7 +774,7 @@ export const TasksScreen: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

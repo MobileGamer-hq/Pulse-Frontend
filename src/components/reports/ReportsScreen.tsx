@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
   CartesianGrid, Tooltip 
@@ -6,7 +7,7 @@ import {
 import { 
   Search, Download, Share2, FileText, 
   CheckCircle2, AlertTriangle, X, ChevronDown, 
-  Calendar, Pencil, MoreVertical, FileCode, FileSpreadsheet, Check
+  Calendar, Pencil, FileCode, FileSpreadsheet, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,6 +24,8 @@ const DAILY_THROUGHPUT_DATA = [
 ];
 
 export const ReportsScreen: React.FC = () => {
+  const { reports } = useApp();
+
   // Screen state: 'library' | 'brief'
   const [viewMode, setViewMode] = useState<'library' | 'brief'>('library');
   const [showExportDrawer, setShowExportDrawer] = useState(false);
@@ -33,8 +36,8 @@ export const ReportsScreen: React.FC = () => {
 
   // Export Drawer State
   const [docFormat, setDocFormat] = useState<'pdf' | 'csv' | 'json'>('pdf');
-  const [startDate, setStartDate] = useState('2023-07-01');
-  const [endDate, setEndDate] = useState('2023-09-30');
+  const [startDate, setStartDate] = useState('2026-08-01');
+  const [endDate, setEndDate] = useState('2026-08-30');
   const [modules, setModules] = useState({
     execSummary: true,
     taskCompletion: true,
@@ -43,15 +46,15 @@ export const ReportsScreen: React.FC = () => {
   });
   const [corporateBranding, setCorporateBranding] = useState(true);
 
-  const REPORTS = [
-    { id: 'rep-1', title: 'Weekly Performance Brief - Week 42', type: 'Weekly', date: '2023-10-24 08:30', status: 'Ready' },
-    { id: 'rep-2', title: 'Monthly Strategic Review - Q3 Close', type: 'Monthly', date: '2023-10-01 14:15', status: 'Draft' },
-    { id: 'rep-3', title: 'Weekly Performance Brief - Week 41', type: 'Weekly', date: '2023-10-17 09:00', status: 'Ready' },
-    { id: 'rep-4', title: 'Weekly Performance Brief - Week 40', type: 'Weekly', date: '2023-10-10 08:45', status: 'Ready' },
-    { id: 'rep-5', title: 'Monthly Strategic Review - August', type: 'Monthly', date: '2023-09-02 11:20', status: 'Ready' }
-  ];
+  const displayReports = reports.map(r => ({
+    id: r.id,
+    title: r.title,
+    type: r.type || 'Weekly',
+    date: r.createdAt || new Date().toISOString().slice(0, 10),
+    status: 'Ready'
+  }));
 
-  const filteredReports = REPORTS.filter(r => {
+  const filteredReports = displayReports.filter(r => {
     if (searchTitle && !r.title.toLowerCase().includes(searchTitle.toLowerCase())) return false;
     if (reportTypeFilter !== 'All' && r.type !== reportTypeFilter) return false;
     return true;
@@ -157,7 +160,27 @@ export const ReportsScreen: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {filteredReports.map(rep => (
+                  {filteredReports.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-10 text-center space-y-3">
+                        <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No generated reports found in database</p>
+                          <p className="text-[11px] text-neutral-500 font-mono">Export a report brief to populate your organization library.</p>
+                        </div>
+                        <button
+                          onClick={() => setShowExportDrawer(true)}
+                          className="px-3.5 py-1.5 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Export New Report
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredReports.map(rep => (
                     <tr key={rep.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 cursor-pointer" onClick={() => setViewMode('brief')}>
                       <td className="py-3.5 font-semibold text-neutral-900 dark:text-neutral-100">
                         <div className="flex items-center gap-2.5">
@@ -191,13 +214,11 @@ export const ReportsScreen: React.FC = () => {
                               <Pencil className="w-4 h-4" />
                             </button>
                           )}
-                          <button className="p-1 rounded text-neutral-400 hover:text-black dark:hover:text-white">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                )}
                 </tbody>
               </table>
             </div>

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   LayoutDashboard, FolderGit2, CheckSquare, BarChart3, 
   Target, Users, Settings, HelpCircle, Archive, Plus, X, Activity, Network,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -177,6 +177,24 @@ export const Sidebar: React.FC = () => {
         >
           <Archive className="w-4 h-4 shrink-0" />
           {!isCollapsed && <span>Archive</span>}
+        </button>
+
+        <button
+          onClick={() => {
+            localStorage.removeItem('pulse_auth_token');
+            localStorage.removeItem('pulse_tenant_slug');
+            localStorage.removeItem('pulse_user_id');
+            localStorage.removeItem('pulse_user_name');
+            localStorage.removeItem('pulse_user_email');
+            window.location.href = '/welcome';
+          }}
+          title={isCollapsed ? 'Sign Out' : undefined}
+          className={`w-full flex items-center ${
+            isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2'
+          } rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all`}
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span>Sign Out</span>}
         </button>
       </div>
     </div>

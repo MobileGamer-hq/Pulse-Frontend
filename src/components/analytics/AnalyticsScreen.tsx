@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { 
@@ -87,6 +88,7 @@ const BLOCKED_TIME_TREND_7D = [
 ];
 
 export const AnalyticsScreen: React.FC = () => {
+  const { tasks } = useApp();
   const [activeTab, setActiveTab] = useState<'insights' | 'habits' | 'team' | 'bottlenecks'>('insights');
   const [dateRange] = useState('Last 30 Days');
 
@@ -710,59 +712,33 @@ export const AnalyticsScreen: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    <tr>
-                      <td className="py-3">
-                        <span className="font-bold text-neutral-900 dark:text-neutral-100 block">PRJ-892: API Gateway Integration</span>
-                        <span className="text-[11px] text-neutral-500 font-sans">Blocked on third-party security audit clearance.</span>
-                      </td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                          • Engineering
-                        </span>
-                      </td>
-                      <td className="py-3 font-bold text-red-600">14 Days</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-[10px]">
-                          JD J. Doe
-                        </span>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3">
-                        <span className="font-bold text-neutral-900 dark:text-neutral-100 block">DSN-104: Design System V3 Migration</span>
-                        <span className="text-[11px] text-neutral-500 font-sans">Pending approval from core product team.</span>
-                      </td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                          • Design
-                        </span>
-                      </td>
-                      <td className="py-3 font-bold text-neutral-900 dark:text-neutral-100">8 Days</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-[10px]">
-                          SM S. Miller
-                        </span>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3">
-                        <span className="font-bold text-neutral-900 dark:text-neutral-100 block">OPS-44: Q3 Compliance Documentation</span>
-                        <span className="text-[11px] text-neutral-500 font-sans">Legal review delayed due to staffing.</span>
-                      </td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                          • Operations
-                        </span>
-                      </td>
-                      <td className="py-3 font-bold text-neutral-900 dark:text-neutral-100">5 Days</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-[10px]">
-                          AK A. Kim
-                        </span>
-                      </td>
-                    </tr>
+                    {tasks.filter(t => t.status === 'Blocked').length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-neutral-400 font-mono">
+                          No blocked tasks or bottlenecks recorded in database.
+                        </td>
+                      </tr>
+                    ) : (
+                      tasks.filter(t => t.status === 'Blocked').map(t => (
+                        <tr key={t.id}>
+                          <td className="py-3">
+                            <span className="font-bold text-neutral-900 dark:text-neutral-100 block">{t.id}: {t.title}</span>
+                            <span className="text-[11px] text-neutral-500 font-sans">{t.blockedReason || t.description || 'Blocked'}</span>
+                          </td>
+                          <td className="py-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                              • {t.projectName || 'General'}
+                            </span>
+                          </td>
+                          <td className="py-3 font-bold text-red-600">Blocked</td>
+                          <td className="py-3 text-right">
+                            <span className="px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-[10px]">
+                              {t.assigneeIds?.[0] || 'Unassigned'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

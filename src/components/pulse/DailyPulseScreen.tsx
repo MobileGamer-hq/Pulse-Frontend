@@ -11,10 +11,7 @@ export const DailyPulseScreen: React.FC = () => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Accomplishments state
-  const [accomplishments, setAccomplishments] = useState<string[]>([
-    'Finalize Q3 Marketing Strategy Draft',
-    'Client Sync: Alpha Corp'
-  ]);
+  const [accomplishments, setAccomplishments] = useState<string[]>([]);
   const [newAccInput, setNewAccInput] = useState('');
 
   // Drag and Drop state for accomplishments

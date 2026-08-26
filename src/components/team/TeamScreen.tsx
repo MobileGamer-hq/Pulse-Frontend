@@ -92,7 +92,7 @@ export const TeamScreen: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1">
-            <span className="text-[10px] text-neutral-400 font-bold uppercase">Active Simulation Role</span>
+            <span className="text-[10px] text-neutral-400 font-bold uppercase">Current User Role</span>
             <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{activeRole}</div>
             <span className={`text-[11px] font-bold ${canManageMembers ? 'text-green-600' : 'text-amber-600'}`}>
               {canManageMembers ? '✓ Full Member Management' : '🔒 Scoped Member View'}
@@ -167,7 +167,27 @@ export const TeamScreen: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {filteredMembers.map(m => (
+                  {filteredMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center space-y-3">
+                        <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No team members added to database yet</p>
+                          <p className="text-[11px] text-neutral-500 font-mono">Invite team members to populate your directory.</p>
+                        </div>
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'team' } }))}
+                          className="px-3.5 py-1.5 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          Invite Member
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMembers.map(m => (
                     <tr key={m.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors">
                       <td className="py-3 font-semibold text-neutral-900 dark:text-neutral-100">
                         <div 
@@ -216,13 +236,13 @@ export const TeamScreen: React.FC = () => {
                               className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"
                               title={`Remove ${m.name} from team`}
                             >
-                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                )}
                 </tbody>
               </table>
             </div>

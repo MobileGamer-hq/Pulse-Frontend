@@ -139,10 +139,17 @@ export interface Project {
 export interface Report {
   id: string;
   orgId: string;
-  type: 'weekly' | 'monthly';
+  type: string;
   title: string;
   periodLabel: string; // e.g. "Week 32, Aug 2026"
+  periodStart?: string;
+  periodEnd?: string;
+  status?: 'Ready' | 'Generating' | 'Draft' | 'Failed' | 'completed' | 'generating' | 'failed' | 'pending';
+  pdfFileUrl?: string;
+  summaryJson?: any;
+  errorMessage?: string;
   createdAt: string;
+  completedAt?: string;
   tasksCompleted: number;
   tasksPlanned: number;
   avgSentiment: number;
@@ -199,3 +206,30 @@ export interface Organization {
   membersCount: number;
   activeProjects: number;
 }
+
+export interface Notification {
+  id: string;
+  orgId: string;
+  recipientId: string;
+  senderId?: string;
+  type: 'waiting_room_approval' | 'waiting_room_approved' | 'blocker_flagged' | 'task_assignment' | 'mention' | 'report_ready' | 'system';
+  title: string;
+  body: string;
+  linkUrl?: string;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+  sender?: {
+    id: string;
+    fullName: string;
+    email: string;
+    avatarUrl?: string;
+  };
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+export type { AnalyticsData } from '../services/analyticsService';

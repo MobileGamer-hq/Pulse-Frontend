@@ -7,7 +7,8 @@ import {
 } from 'recharts';
 import { 
   Plus, MoreHorizontal, UserPlus, Link2, 
-  ChevronDown, Target, GripVertical 
+  ChevronDown, Target, GripVertical,
+  User, Calendar, ArrowLeft, Trash2
 } from 'lucide-react';
 
 const ROLLUP_PROGRESS_DATA = [
@@ -18,12 +19,29 @@ const ROLLUP_PROGRESS_DATA = [
 ];
 
 export const GoalsScreen: React.FC = () => {
-  const { goals, reorderGoals } = useApp();
+  const { goals, reorderGoals, updateGoal } = useApp();
 
   // Screen view state: 'grid' | 'detail' | 'create_kr'
   const [viewState, setViewState] = useState<'grid' | 'detail' | 'create_kr'>('grid');
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState('All Departments');
-  const [selectedQuarter, setSelectedQuarter] = useState('Q3 2023');
+  const [selectedQuarter, setSelectedQuarter] = useState('Current Quarter');
+
+  const selectedGoal = goals.find(g => g.id === selectedGoalId) || goals[0];
+
+  // Inline Goal Editing state
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [editGoalTitle, setEditGoalTitle] = useState('');
+  const [editGoalDesc, setEditGoalDesc] = useState('');
+  const [editGoalDate, setEditGoalDate] = useState('');
+
+  React.useEffect(() => {
+    if (selectedGoal) {
+      setEditGoalTitle(selectedGoal.title);
+      setEditGoalDesc(selectedGoal.description || '');
+      setEditGoalDate(selectedGoal.targetDate || '');
+    }
+  }, [selectedGoal?.id, selectedGoal?.title, selectedGoal?.description, selectedGoal?.targetDate]);
 
   // New Key Result Form state
   const [krTitle, setKrTitle] = useState('');
@@ -32,19 +50,23 @@ export const GoalsScreen: React.FC = () => {
   const [startVal, setStartVal] = useState('0');
   const [targetVal, setTargetVal] = useState('100');
 
-  const INITIAL_OBJECTIVES = goals.map(g => ({
-    id: g.id,
-    dept: g.ownerType === 'team' ? 'Engineering' : 'Org',
-    quarter: 'Q3 2023',
-    title: g.title,
-    owner: g.ownerName,
-    avatar: undefined,
-    status: g.status === 'OnTrack' ? 'On Track' : g.status === 'AtRisk' ? 'At Risk' : 'Behind',
-    krCount: g.keyResults.length,
-    progress: g.keyResults.length > 0 ? Math.round(g.keyResults.reduce((acc, kr) => acc + (kr.currentValue / kr.targetValue), 0) / g.keyResults.length * 100) : 0
-  }));
+  const [objectives, setObjectives] = useState<any[]>([]);
 
-  const [objectives, setObjectives] = useState(INITIAL_OBJECTIVES);
+  React.useEffect(() => {
+    const mapped = goals.map(g => ({
+      id: g.id,
+      dept: g.ownerType === 'team' ? 'Engineering' : 'Org',
+      quarter: 'Current Quarter',
+      title: g.title,
+      owner: g.ownerName,
+      avatar: undefined,
+      status: g.status === 'OnTrack' ? 'On Track' : g.status === 'AtRisk' ? 'At Risk' : 'Behind',
+      krCount: g.keyResults.length,
+      progress: g.keyResults.length > 0 ? Math.round(g.keyResults.reduce((acc, kr) => acc + (kr.currentValue / (kr.targetValue || 1)), 0) / g.keyResults.length * 100) : 0
+    }));
+    setObjectives(mapped);
+  }, [goals]);
+
   const [draggedObjId, setDraggedObjId] = useState<string | null>(null);
   const [dragOverObjId, setDragOverObjId] = useState<string | null>(null);
 
@@ -71,12 +93,23 @@ export const GoalsScreen: React.FC = () => {
     setDragOverObjId(null);
   };
 
-  const handleSaveKR = (e: React.FormEvent) => {
+  const handleSaveKR = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!krTitle.trim()) return;
-    alert(`Key Result "${krTitle}" created successfully!`);
-    setKrTitle('');
-    setViewState('detail');
+    if (!krTitle.trim() || !selectedGoal) return;
+    const newKR = {
+      id: `kr-${Date.now()}`,
+      title: krTitle.trim(),
+      targetValue: Number(targetVal) || 100,
+      currentValue: Number(startVal) || 0,
+      unit: metricType === 'Percentage' ? '%' : 'pts',
+      linkedTaskIds: []
+    };
+    const updatedKRs = [...(selectedGoal.keyResults || []), newKR];
+    try {
+      await updateGoal(selectedGoal.id, { keyResults: updatedKRs });
+      setKrTitle('');
+      setViewState('detail');
+    } catch (err) { console.warn(err); }
   };
 
   return (
@@ -87,7 +120,7 @@ export const GoalsScreen: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Strategic Objectives</h1>
-              <p className="text-xs text-neutral-500 font-mono mt-0.5">Company OKRs for Q3 2023</p>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Strategic OKRs &amp; Key Results</p>
             </div>
 
             <div className="flex items-center gap-3 font-mono">
@@ -111,9 +144,9 @@ export const GoalsScreen: React.FC = () => {
                   onChange={e => setSelectedQuarter(e.target.value)}
                   className="appearance-none px-3.5 py-2 pr-8 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-none"
                 >
-                  <option>Q3 2023</option>
-                  <option>Q4 2023</option>
-                  <option>Q1 2024</option>
+                  <option>Current Quarter</option>
+                  <option>Next Quarter</option>
+                  <option>All Quarters</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -172,7 +205,10 @@ export const GoalsScreen: React.FC = () => {
                     e.preventDefault();
                     handleObjectiveDrop(obj.id);
                   }}
-                  onClick={() => setViewState('detail')}
+                  onClick={() => {
+                    setSelectedGoalId(obj.id);
+                    setViewState('detail');
+                  }}
                   className={`p-5 rounded-2xl bg-white dark:bg-neutral-900 border space-y-4 cursor-grab active:cursor-grabbing hover:border-neutral-400 transition-all ${
                     isDragging ? 'opacity-30' : 'shadow-sm'
                   } ${isDragOver ? 'border-2 border-black dark:border-white ring-2 ring-black/10' : 'border-neutral-200 dark:border-neutral-800'}`}
@@ -203,7 +239,7 @@ export const GoalsScreen: React.FC = () => {
                       obj.status === 'At Risk' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
                       'bg-red-50 text-red-800 border border-red-200'
                     }`}>
-                      {obj.status === 'On Track' ? '✓ On Track' : obj.status === 'At Risk' ? '! At Risk' : '✕ Behind'}
+                      {obj.status === 'On Track' ? 'On Track' : obj.status === 'At Risk' ? 'At Risk' : 'Behind'}
                     </span>
                   </div>
 
@@ -224,61 +260,153 @@ export const GoalsScreen: React.FC = () => {
       </div>
     )}
 
-      {/* 2. OBJECTIVE DETAIL & PROGRESS ROLLUP VIEW matching Screenshot 2 */}
+      {/* 2. OBJECTIVE DETAIL & PROGRESS ROLLUP VIEW */}
       {viewState === 'detail' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between font-mono pb-2 border-b border-neutral-200 dark:border-neutral-800">
-            <button onClick={() => setViewState('grid')} className="text-xs text-neutral-500 hover:text-black dark:hover:text-white">
-              ← Back to Strategic Objectives
+            <button onClick={() => setViewState('grid')} className="text-xs text-neutral-500 hover:text-black dark:hover:text-white flex items-center gap-1.5 cursor-pointer">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Strategic Objectives
             </button>
           </div>
 
-          {/* Header Card matching Screenshot 2 */}
+          {/* Dynamic Header Card */}
           <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 font-mono">
               <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
-                    OBJ-Q3-01
+                    OBJ-{(selectedGoal?.id || 'G1').slice(0, 6).toUpperCase()}
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-800 border border-neutral-300">
-                    • On Track
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    selectedGoal?.status === 'OnTrack' ? 'bg-neutral-100 text-neutral-800 border border-neutral-300' :
+                    selectedGoal?.status === 'AtRisk' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+                    'bg-red-50 text-red-800 border border-red-200'
+                  }`}>
+                    {selectedGoal?.status === 'OnTrack' ? 'On Track' : selectedGoal?.status === 'AtRisk' ? 'At Risk' : 'Behind'}
                   </span>
                 </div>
 
-                <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug font-sans">
-                  Accelerate Platform Performance & Reduce Latency
-                </h1>
-                <p className="text-xs text-neutral-500 font-sans leading-relaxed">
-                  Optimize core infrastructure to deliver sub-100ms response times globally while maintaining 99.99% uptime during peak load events.
-                </p>
+                {isEditingGoal ? (
+                  <div className="p-4 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 space-y-3 font-mono">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Objective Title</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editGoalTitle}
+                        onChange={e => setEditGoalTitle(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Description</label>
+                      <textarea
+                        rows={3}
+                        value={editGoalDesc}
+                        onChange={e => setEditGoalDesc(e.target.value)}
+                        placeholder="Objective context..."
+                        className="w-full p-3 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-sans text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Target Date</label>
+                      <input
+                        type="date"
+                        value={editGoalDate}
+                        onChange={e => setEditGoalDate(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditGoalTitle(selectedGoal?.title || '');
+                          setEditGoalDesc(selectedGoal?.description || '');
+                          setEditGoalDate(selectedGoal?.targetDate || '');
+                          setIsEditingGoal(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedGoal || !editGoalTitle.trim()) return;
+                          try {
+                            await updateGoal(selectedGoal.id, {
+                              title: editGoalTitle.trim(),
+                              description: editGoalDesc.trim(),
+                              targetDate: editGoalDate
+                            });
+                            setIsEditingGoal(false);
+                          } catch (err) { console.warn(err); }
+                        }}
+                        className="px-4 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold hover:opacity-90 cursor-pointer"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug font-sans">
+                      {selectedGoal?.title || 'Accelerate Platform Performance & Reduce Latency'}
+                    </h1>
+                    <p className="text-xs text-neutral-500 font-sans leading-relaxed mt-1">
+                      {selectedGoal?.description || 'Optimize core infrastructure to deliver high performance.'}
+                    </p>
 
-                <div className="flex items-center gap-2 pt-2 text-xs">
-                  <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium">
-                    👤 Elena Rostova
-                  </span>
-                  <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium">
-                    📅 Q3 2024
-                  </span>
-                </div>
+                    <div className="flex items-center gap-2 pt-3 text-xs">
+                      <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-neutral-400" />
+                        {selectedGoal?.ownerName || 'Elena Rostova'}
+                      </span>
+                      <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                        {selectedGoal?.targetDate || 'Current Quarter'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 shrink-0 text-right">
-                <div className="space-y-1">
-                  <div className="flex justify-end items-baseline gap-2">
-                    <span className="text-[10px] text-neutral-400 uppercase font-bold">Overall Progress</span>
-                    <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">68%</span>
-                  </div>
-                  <div className="w-48 h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden ml-auto">
-                    <div className="h-full bg-black dark:bg-white rounded-full" style={{ width: '68%' }} />
-                  </div>
-                </div>
+                {(() => {
+                  const progress = selectedGoal && selectedGoal.keyResults.length > 0
+                    ? Math.round(selectedGoal.keyResults.reduce((acc, kr) => acc + (kr.currentValue / (kr.targetValue || 1)), 0) / selectedGoal.keyResults.length * 100)
+                    : 0;
+                  return (
+                    <div className="space-y-1">
+                      <div className="flex justify-end items-baseline gap-2">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold">Overall Progress</span>
+                        <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{progress}%</span>
+                      </div>
+                      <div className="w-48 h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden ml-auto">
+                        <div className="h-full bg-black dark:bg-white rounded-full" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="flex items-center justify-end gap-2 pt-2">
-                  <button className="px-3.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold">
-                    Edit
+                  <button 
+                    onClick={() => setIsEditingGoal(prev => !prev)}
+                    className="px-3.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer"
+                  >
+                    {isEditingGoal ? 'Cancel Edit' : 'Edit'}
                   </button>
-                  <button className="px-4 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold shadow-sm">
+                  <button 
+                    onClick={async () => {
+                      if (!selectedGoal) return;
+                      const nextStatus = selectedGoal.status === 'OnTrack' ? 'AtRisk' : selectedGoal.status === 'AtRisk' ? 'Behind' : 'OnTrack';
+                      try {
+                        await updateGoal(selectedGoal.id, { status: nextStatus });
+                      } catch (err) { console.warn(err); }
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold shadow-sm hover:opacity-90 cursor-pointer"
+                  >
                     Update Status
                   </button>
                 </div>
@@ -286,46 +414,85 @@ export const GoalsScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Key Results & Progress Rollup Grid matching Screenshot 2 */}
+          {/* Key Results & Progress Rollup Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono">
             {/* Key Results Box (2 Cols) */}
             <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 flex items-center gap-2 font-sans">
-                  <Target className="w-4 h-4" /> Key Results
+                  <Target className="w-4 h-4" /> Key Results ({selectedGoal?.keyResults?.length || 0})
                 </h3>
                 <button 
                   onClick={() => setViewState('create_kr')}
-                  className="p-1 rounded text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="p-1 rounded text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  title="Add Key Result"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="space-y-3">
-                {/* KR 1 */}
-                <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2">
-                  <div className="flex justify-between items-center font-semibold">
-                    <span className="text-neutral-900 dark:text-neutral-100 font-sans">Reduce P99 API latency to &lt; 100ms</span>
-                    <span className="text-[11px] text-neutral-500 font-mono">145ms / 100ms • <strong className="text-neutral-900 dark:text-neutral-100">45%</strong></span>
+                {(!selectedGoal?.keyResults || selectedGoal.keyResults.length === 0) ? (
+                  <div className="p-6 text-center border border-dashed border-neutral-300 dark:border-neutral-700 rounded-xl space-y-2">
+                    <p className="text-xs text-neutral-500 font-mono">No Key Results defined yet.</p>
+                    <button
+                      onClick={() => setViewState('create_kr')}
+                      className="px-3 py-1.5 bg-black text-white dark:bg-white dark:text-black font-mono font-bold rounded-lg text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> + Add Key Result
+                    </button>
                   </div>
-                  <p className="text-[10px] text-neutral-400">Owner: Alex Chen • Updated 2d ago</p>
-                  <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                    <div className="h-full bg-black dark:bg-white rounded-full" style={{ width: '45%' }} />
-                  </div>
-                </div>
-
-                {/* KR 2 */}
-                <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2">
-                  <div className="flex justify-between items-center font-semibold">
-                    <span className="text-neutral-900 dark:text-neutral-100 font-sans">Migrate 100% of legacy edge nodes to new infrastructure</span>
-                    <span className="text-[11px] text-neutral-500 font-mono">85% / 100% • <strong className="text-neutral-900 dark:text-neutral-100">85%</strong></span>
-                  </div>
-                  <p className="text-[10px] text-neutral-400">Owner: Sarah Jenkins • Updated 5h ago</p>
-                  <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                    <div className="h-full bg-black dark:bg-white rounded-full" style={{ width: '85%' }} />
-                  </div>
-                </div>
+                ) : (
+                  selectedGoal.keyResults.map((kr, krIdx) => {
+                    const krPct = Math.min(100, Math.round((kr.currentValue / (kr.targetValue || 1)) * 100));
+                    return (
+                      <div key={kr.id || krIdx} className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2">
+                        <div className="flex justify-between items-center font-semibold">
+                          <span className="text-neutral-900 dark:text-neutral-100 font-sans">{kr.title}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-neutral-500 font-mono">
+                              Current:
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              max={kr.targetValue}
+                              value={kr.currentValue}
+                              onChange={async (e) => {
+                                const val = Number(e.target.value);
+                                const newKRs = [...selectedGoal.keyResults];
+                                newKRs[krIdx] = { ...newKRs[krIdx], currentValue: val };
+                                try {
+                                  await updateGoal(selectedGoal.id, { keyResults: newKRs });
+                                } catch (err) { console.warn(err); }
+                              }}
+                              className="w-16 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-xs font-mono font-bold text-right"
+                            />
+                            <span className="text-[11px] text-neutral-500 font-mono">
+                              / {kr.targetValue}{kr.unit || ''} • <strong className="text-neutral-900 dark:text-neutral-100">{krPct}%</strong>
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const newKRs = selectedGoal.keyResults.filter((_, i) => i !== krIdx);
+                                try {
+                                  await updateGoal(selectedGoal.id, { keyResults: newKRs });
+                                } catch (err) { console.warn(err); }
+                              }}
+                              className="p-1 text-neutral-400 hover:text-red-500 cursor-pointer"
+                              title="Delete Key Result"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-neutral-400">Owner: {selectedGoal.ownerName || 'Lead'} • Cadence: Weekly</p>
+                        <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                          <div className="h-full bg-black dark:bg-white rounded-full transition-all" style={{ width: `${krPct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 

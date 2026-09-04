@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   LayoutDashboard, FolderGit2, CheckSquare, BarChart3, 
   Target, Users, Settings, HelpCircle, Archive, Plus, X, Activity, Network,
-  PanelLeftClose, PanelLeftOpen, LogOut
+  PanelLeftClose, PanelLeftOpen, LogOut, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -31,6 +31,7 @@ export const Sidebar: React.FC = () => {
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'pulse', label: 'Daily Pulse', icon: Activity },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'goals', label: 'Goals', icon: Target },
     { id: 'team', label: 'Team', icon: Users }
   ];

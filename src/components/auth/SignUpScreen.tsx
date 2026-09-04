@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User as UserIcon, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { supabase } from '../../services/supabaseClient';
+import { authService } from '../../services/authService';
 
 export const SignUpScreen: React.FC = () => {
   const navigate = useNavigate();
+  const { updateCurrentUser } = useApp();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,16 +44,51 @@ export const SignUpScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      // Register user account state
-      localStorage.setItem('pulse_auth_token', `token-${Date.now()}`);
-      localStorage.setItem('pulse_user_id', `usr-${Date.now()}`);
+      // 1. Sign up with Supabase Auth
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (signUpError) {
+        throw new Error(signUpError.message);
+      }
+
+      const session = data.session;
+      const user = data.user;
+
+      if (!user) {
+        throw new Error('Sign up failed: User record not created in Supabase.');
+      }
+
+      const authToken = session?.access_token || user.id;
+
+      // 2. Update React Context & Store session token in localStorage
+      updateCurrentUser({
+        id: user.id,
+        email,
+        name: fullName,
+      });
+
+      localStorage.setItem('pulse_auth_token', authToken);
+      localStorage.setItem('pulse_user_id', user.id);
       localStorage.setItem('pulse_user_email', email);
       localStorage.setItem('pulse_user_name', fullName);
-      // Mark user as new account so orgs list is 0 by default
       localStorage.setItem('pulse_is_new_user', 'true');
       localStorage.removeItem('pulse_tenant_slug');
 
-      // Navigate to Organizations page (which will now show 0 organizations)
+      // 3. Sync user profile with PostgreSQL backend
+      await authService.syncUser({
+        email,
+        fullName,
+      }).catch((syncErr) => console.warn('[Backend User Sync Notice]:', syncErr));
+
+      // Navigate to Organizations page
       navigate('/select-org');
     } catch (err: any) {
       setError(err.message || 'Failed to create user account.');
@@ -86,8 +125,9 @@ export const SignUpScreen: React.FC = () => {
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold">
-            ⚠️ {error}
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -102,9 +142,9 @@ export const SignUpScreen: React.FC = () => {
                 type="text"
                 required
                 value={fullName}
-                onChange={e => { setFullName(e.target.value); setError(null); }}
-                placeholder="e.g. Alex Morgan"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-white"
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Alex Rivera"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
           </div>
@@ -119,9 +159,9 @@ export const SignUpScreen: React.FC = () => {
                 type="email"
                 required
                 value={email}
-                onChange={e => { setEmail(e.target.value); setError(null); }}
+                onChange={e => setEmail(e.target.value)}
                 placeholder="alex@company.com"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-white"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
           </div>
@@ -135,11 +175,10 @@ export const SignUpScreen: React.FC = () => {
               <input
                 type="password"
                 required
-                minLength={6}
                 value={password}
-                onChange={e => { setPassword(e.target.value); setError(null); }}
-                placeholder="At least 6 characters"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-white"
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
           </div>
@@ -154,48 +193,50 @@ export const SignUpScreen: React.FC = () => {
                 type="password"
                 required
                 value={confirmPassword}
-                onChange={e => { setConfirmPassword(e.target.value); setError(null); }}
-                placeholder="Repeat password"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-white"
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
           </div>
 
-          <div className="flex items-start gap-2 pt-1 text-[11px] text-neutral-600 dark:text-neutral-400 font-sans">
+          <div className="flex items-center gap-2 pt-1">
             <input
               type="checkbox"
+              id="agreeTerms"
               checked={agreeTerms}
               onChange={e => setAgreeTerms(e.target.checked)}
-              className="mt-0.5 rounded border-neutral-300 dark:border-neutral-700"
+              className="w-4 h-4 rounded border-neutral-300 dark:border-neutral-700 text-blue-600 focus:ring-blue-500"
             />
-            <span>I agree to Pulse by Epicordia terms &amp; privacy guidelines.</span>
+            <label htmlFor="agreeTerms" className="text-[11px] text-neutral-600 dark:text-neutral-400">
+              I agree to the Workspace Terms & Privacy Policy
+            </label>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-50"
           >
             {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
               <>
-                <span>REGISTER ACCOUNT &amp; CONTINUE</span>
-                <ArrowRight className="w-4 h-4" />
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Creating Account in Supabase...</span>
               </>
+            ) : (
+              <span>Create Account</span>
             )}
           </button>
         </form>
 
-        {/* Footer Link */}
-        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-[11px] font-mono">
-          <span className="text-neutral-400">Already have an account?</span>
+        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 text-center text-xs">
+          <span className="text-neutral-500">Already registered? </span>
           <button
             type="button"
-            onClick={() => navigate('/login')}
-            className="font-bold text-black dark:text-white hover:underline cursor-pointer"
+            onClick={() => navigate('/signin')}
+            className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
           >
-            Sign In →
+            Sign In to your Account
           </button>
         </div>
       </div>

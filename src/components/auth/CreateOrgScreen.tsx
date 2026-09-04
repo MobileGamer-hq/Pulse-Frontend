@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Code, Compass, TrendingUp, LayoutGrid, Users, Check, ArrowRight, Loader2 } from 'lucide-react';
+import { Building2, Code, Compass, TrendingUp, LayoutGrid, Users, Check, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { WorkflowTemplate } from '../../types';
 
 export const CreateOrgScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, addOrg } = useApp();
+  const { currentUser, addOrg, addTeam, setCurrentOrgSlug } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const [orgName, setOrgName] = useState('');
@@ -63,12 +63,28 @@ export const CreateOrgScreen: React.FC = () => {
         activeProjects: 1
       };
 
-      // Add org into context & localStorage
+      // Set active workspace context
+      if (setCurrentOrgSlug) {
+        setCurrentOrgSlug(slug);
+      }
+
+      // 1. Create Organization in Backend & Context
       if (addOrg) {
-        addOrg(newOrg);
+        await addOrg(newOrg);
       } else {
         const storedOrgs = JSON.parse(localStorage.getItem('pulse_user_orgs') || '[]');
         localStorage.setItem('pulse_user_orgs', JSON.stringify([...storedOrgs, newOrg]));
+      }
+
+      // 2. Create Initial Primary Team (e.g. Core Team) with Workflow Template and explicit slug
+      if (addTeam) {
+        await addTeam({
+          name: teamName || 'Core Team',
+          leadId: currentUser.id,
+          leadName: currentUser.name,
+          memberIds: [currentUser.id],
+          workflowTemplate: selectedTemplate || 'SoftwareSprint',
+        }, slug);
       }
 
       localStorage.setItem('pulse_is_new_user', 'false');
@@ -76,10 +92,8 @@ export const CreateOrgScreen: React.FC = () => {
       localStorage.setItem(`pulse_org_status_${slug}`, 'APPROVED');
       localStorage.setItem(`pulse_user_role_${slug}`, 'Admin');
 
-      setTimeout(() => {
-        setLoading(false);
-        navigate(`/${slug}/dashboard`);
-      }, 500);
+      setLoading(false);
+      navigate(`/${slug}/dashboard`);
     } catch (err: any) {
       setError(err.message || 'Failed to create organization.');
       setLoading(false);
@@ -176,8 +190,9 @@ export const CreateOrgScreen: React.FC = () => {
       </div>
 
       {error && (
-        <div className="w-full max-w-2xl mb-6 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold">
-          ⚠️ {error}
+        <div className="w-full max-w-2xl mb-6 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 

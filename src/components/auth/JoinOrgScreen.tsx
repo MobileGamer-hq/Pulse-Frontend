@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Key, ArrowRight, Clock, Building2 } from 'lucide-react';
+import { Key, ArrowRight, Clock, Building2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const JoinOrgScreen: React.FC = () => {
@@ -86,8 +86,9 @@ export const JoinOrgScreen: React.FC = () => {
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold">
-            ⚠️ {error}
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 

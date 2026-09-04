@@ -8,28 +8,41 @@ import {
 } from 'lucide-react';
 
 export const ProjectsScreen: React.FC = () => {
-  const { pushPanel, projects, reorderProjects } = useApp();
+  const { pushPanel, projects, tasks, users, reorderProjects } = useApp();
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Active');
-  const [deptFilter, setDeptFilter] = useState('Engineering');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [deptFilter, setDeptFilter] = useState('All');
   const [ownerFilter, setOwnerFilter] = useState('All');
 
-  // Convert AppContext projects or default projects list
-  const INITIAL_PROJECT_ITEMS = projects.map(p => ({
-    id: p.id,
-    code: p.id.toUpperCase(),
-    name: p.name,
-    status: p.status,
-    progress: p.status === 'Completed' ? 100 : p.status === 'Active' ? 68 : 12,
-    avatars: [],
-    extraAvatars: 0,
-    targetCount: 0,
-    doneCount: 0
-  }));
+  const [projectItems, setProjectItems] = useState<any[]>([]);
 
-  const [projectItems, setProjectItems] = useState(INITIAL_PROJECT_ITEMS);
+  React.useEffect(() => {
+    const items = projects.map(p => {
+      const projectTasks = tasks.filter(t => t.projectId === p.id);
+      const doneCount = projectTasks.filter(t => t.status === 'Done').length;
+      const targetCount = projectTasks.length;
+      const progress = targetCount > 0 ? Math.round((doneCount / targetCount) * 100) : (p.status === 'Completed' ? 100 : 0);
+      const memberUsers = users.filter(u => p.memberIds?.includes(u.id));
+      const avatars = memberUsers.slice(0, 3).map(u => ({ name: u.name, avatarUrl: u.avatarUrl }));
+      const extraAvatars = Math.max(0, memberUsers.length - 3);
+
+      return {
+        id: p.id,
+        code: (p.id || 'PRJ').substring(0, 8).toUpperCase(),
+        name: p.name,
+        status: p.status || 'Active',
+        progress,
+        avatars,
+        extraAvatars,
+        targetCount,
+        doneCount
+      };
+    });
+    setProjectItems(items);
+  }, [projects, tasks, users]);
+
   const [draggedPrjId, setDraggedPrjId] = useState<string | null>(null);
   const [dragOverPrjId, setDragOverPrjId] = useState<string | null>(null);
 
@@ -57,7 +70,7 @@ export const ProjectsScreen: React.FC = () => {
 
   const filteredProjects = projectItems.filter(p => {
     if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase()) && !p.code.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (statusFilter !== 'All' && p.status !== statusFilter) return false;
+    if (statusFilter !== 'All' && p.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
     return true;
   });
 
@@ -67,7 +80,9 @@ export const ProjectsScreen: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Project Roster</h1>
-          <p className="text-xs text-neutral-500 font-mono mt-0.5">Active monitoring of 24 concurrent initiatives.</p>
+          <p className="text-xs text-neutral-500 font-mono mt-0.5">
+            Active monitoring of {projects.length} concurrent {projects.length === 1 ? 'initiative' : 'initiatives'}.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -221,7 +236,7 @@ export const ProjectsScreen: React.FC = () => {
                     prj.status === 'Planning' ? 'bg-neutral-50 text-neutral-600 border border-neutral-200' :
                     'bg-neutral-100 text-neutral-700 border border-neutral-300'
                   }`}>
-                    {prj.status === 'Active' ? '• Active' : prj.status === 'Planning' ? '○ Planning' : '✓ Completed'}
+                    {prj.status === 'Active' ? 'Active' : prj.status === 'Planning' ? 'Planning' : 'Completed'}
                   </span>
                 </div>
 
@@ -241,7 +256,7 @@ export const ProjectsScreen: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800">
                   <div className="flex items-center -space-x-1.5">
-                    {prj.avatars.map((name, i) => (
+                    {prj.avatars.map((name: string, i: number) => (
                       <UserAvatar key={i} name={name} size="xs" />
                     ))}
                     {prj.extraAvatars > 0 && (

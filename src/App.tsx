@@ -15,6 +15,7 @@ import { AnalyticsScreen } from './components/analytics/AnalyticsScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { TeamScreen } from './components/team/TeamScreen';
 import { AdminSettingsScreen } from './components/admin/AdminSettingsScreen';
+import { ArchiveScreen } from './components/common/ArchiveScreen';
 import { NotificationsScreen } from './components/notifications/NotificationsScreen';
 import { RelationshipsScreen } from './components/relationships/RelationshipsScreen';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
@@ -142,6 +143,7 @@ const MainLayout: React.FC = () => {
             {activeScreen === 'reports' && <ReportsScreen />}
             {activeScreen === 'team' && <TeamScreen />}
             {activeScreen === 'admin' && <AdminSettingsScreen />}
+            {activeScreen === 'archive' && <ArchiveScreen />}
             {activeScreen === 'notifications' && <NotificationsScreen />}
           </main>
         </div>
@@ -200,14 +202,24 @@ export default function App() {
               onNavigateToInvite={() => window.location.href = '/invite/demo'}
             />
           } />
+          <Route path="/signin" element={
+            <SignInScreen
+              onSuccess={() => {
+                window.location.href = '/select-org';
+              }}
+              onNavigateToSetup={() => window.location.href = '/register'}
+              onNavigateToInvite={() => window.location.href = '/invite/demo'}
+            />
+          } />
           <Route path="/register" element={<SignUpScreen />} />
+          <Route path="/signup" element={<SignUpScreen />} />
           <Route path="/select-org" element={<OrgSwitcherScreen />} />
           <Route path="/create-org" element={<CreateOrgScreen />} />
           <Route path="/join-org" element={<JoinOrgScreen />} />
           <Route path="/invite/:token" element={
             <InviteAcceptanceScreen onComplete={() => {
-              const slug = localStorage.getItem('pulse_tenant_slug') || 'epicordia';
-              window.location.href = `/${slug}/waiting-room`;
+              const slug = localStorage.getItem('pulse_tenant_slug') || 'apexdynamics';
+              window.location.href = `/${slug}/dashboard`;
             }} />
           } />
 

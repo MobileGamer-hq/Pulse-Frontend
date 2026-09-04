@@ -3,9 +3,10 @@ import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { 
   Pencil, Link as LinkIcon, X, Plus, 
-  ShieldAlert, MessageSquare, GripVertical,
+  MessageSquare, GripVertical,
   Trash2, Edit2, Check
 } from 'lucide-react';
+import type { TaskStatus, Priority } from '../../types';
 
 interface TaskDetailPanelProps {
   id: string;
@@ -28,17 +29,31 @@ function formatTimeAgo(isoString: string): string {
 
 export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
   const { 
-    tasks, users, tags, currentUser,
-    updateTask, addSubtask, updateSubtask, deleteSubtask, toggleSubtask, 
-    addComment, updateComment, deleteComment, popPanel 
+    tasks, projects, users, tags, currentUser,
+    updateTask, deleteTask, addSubtask, updateSubtask, deleteSubtask, toggleSubtask, 
+    addComment, updateComment, deleteComment, popPanel,
+    attachTagToEntity, detachTagFromEntity
   } = useApp();
 
   const task = tasks.find(t => t.id === id);
+
+  // Task title & description editing state
+  const [isEditingMain, setIsEditingMain] = useState(false);
+  const [editTitle, setEditTitle] = useState(task?.title || '');
+  const [editDescription, setEditDescription] = useState(task?.description || '');
+
+  React.useEffect(() => {
+    if (task) {
+      setEditTitle(task.title);
+      setEditDescription(task.description || '');
+    }
+  }, [task?.title, task?.description]);
 
   // Subtask creation state
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>('');
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [isAddingTag, setIsAddingTag] = useState(false);
 
   // Subtask editing state
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
@@ -122,7 +137,27 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+          <button 
+            onClick={() => {
+              if (window.confirm(`Are you sure you want to delete task "${task.title}"?`)) {
+                deleteTask(task.id);
+                popPanel();
+              }
+            }}
+            title="Delete Task" 
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setIsEditingMain(true)}
+            title="Edit Task Title & Description"
+            className={`p-1.5 rounded-lg transition-colors ${
+              isEditingMain 
+                ? 'bg-black text-white dark:bg-white dark:text-black' 
+                : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
             <Pencil className="w-4 h-4" />
           </button>
           <button className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
@@ -138,18 +173,81 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Title, Description, Subtasks Breakdown */}
         <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug">
-              {task.title}
-            </h1>
-
-            <div className="mt-4 space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-400 block">Description</span>
-              <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                {task.description || 'No detailed description provided for this task.'}
-              </p>
+          {isEditingMain ? (
+            <div className="p-4 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 space-y-3 font-mono">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Task Title</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Description</label>
+                <textarea
+                  rows={4}
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  placeholder="Task detailed notes..."
+                  className="w-full p-3 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-sans text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditTitle(task.title);
+                    setEditDescription(task.description || '');
+                    setIsEditingMain(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!editTitle.trim()) return;
+                    try {
+                      await updateTask(task.id, {
+                        title: editTitle.trim(),
+                        description: editDescription.trim()
+                      });
+                      setIsEditingMain(false);
+                    } catch (err) { console.warn(err); }
+                  }}
+                  className="px-4 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold hover:opacity-90"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="group relative">
+              <div className="flex items-start justify-between gap-2">
+                <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug">
+                  {task.title}
+                </h1>
+                <button
+                  onClick={() => setIsEditingMain(true)}
+                  className="p-1 rounded text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  title="Edit title & description"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-400 block">Description</span>
+                <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                  {task.description || 'No detailed description provided for this task.'}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Subtasks Section */}
           <div className="space-y-3 pt-2">
@@ -218,7 +316,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
                           : 'border-neutral-300 dark:border-neutral-700 hover:border-neutral-500'
                       }`}
                     >
-                      {s.done && <span className="text-[10px] font-bold">✓</span>}
+                      {s.done && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                     </div>
 
                     {/* Title or Edit Input */}
@@ -358,18 +456,131 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
         {/* Right Metadata Column */}
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-4 font-mono">
-            {/* Priority */}
+            {/* Status Selector */}
             <div>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Priority</span>
-              <div className={`flex items-center gap-1.5 font-bold text-xs ${
-                task.priority === 'Urgent' ? 'text-red-600' : task.priority === 'High' ? 'text-orange-600' : 'text-neutral-700 dark:text-neutral-300'
-              }`}>
-                <span className="text-sm">⇡</span> {task.priority} Priority
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Status</label>
+              <select
+                value={task.status}
+                onChange={async e => {
+                  try {
+                    await updateTask(task.id, { status: e.target.value as TaskStatus });
+                  } catch (err) { console.warn(err); }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                <option value="Todo">To Do</option>
+                <option value="InProgress">In Progress</option>
+                <option value="AtRisk">At Risk</option>
+                <option value="Blocked">Blocked</option>
+                <option value="Done">Done</option>
+              </select>
+            </div>
+
+            {/* Priority Selector */}
+            <div>
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Priority</label>
+              <select
+                value={task.priority}
+                onChange={async e => {
+                  try {
+                    await updateTask(task.id, { priority: e.target.value as Priority });
+                  } catch (err) { console.warn(err); }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            {/* Assigned Project Selector */}
+            <div>
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Assigned Project</label>
+              <select
+                value={task.projectId}
+                onChange={async e => {
+                  const targetProj = projects.find(p => p.id === e.target.value);
+                  try {
+                    await updateTask(task.id, { projectId: e.target.value, projectName: targetProj ? targetProj.name : 'Project' });
+                  } catch (err) { console.warn(err); }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Assignee Selector */}
+            <div>
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Assigned Member</label>
+              <select
+                value={task.assigneeIds[0] || ''}
+                onChange={async e => {
+                  const newAssigneeId = e.target.value;
+                  try {
+                    await updateTask(task.id, { assigneeIds: newAssigneeId ? [newAssigneeId] : [] });
+                  } catch (err) { console.warn(err); }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                <option value="">Unassigned</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Due Date, Est Hours & Actual Hours */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={task.dueDate || ''}
+                  onChange={async e => {
+                    try {
+                      await updateTask(task.id, { dueDate: e.target.value });
+                    } catch (err) { console.warn(err); }
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Est. Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={task.estimatedHours || 0}
+                  onChange={async e => {
+                    try {
+                      await updateTask(task.id, { estimatedHours: Number(e.target.value) });
+                    } catch (err) { console.warn(err); }
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Actual Logged</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={task.actualHours || 0}
+                  onChange={async e => {
+                    try {
+                      await updateTask(task.id, { actualHours: Number(e.target.value) });
+                    } catch (err) { console.warn(err); }
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none font-mono"
+                />
               </div>
             </div>
 
-            {/* Time Logged */}
-            <div className="space-y-1">
+            {/* Time Logged Progress Bar */}
+            <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[11px] text-neutral-500 font-semibold">
                 <span>Time Logged</span>
                 <span>{task.actualHours}h / {task.estimatedHours}h</span>
@@ -382,54 +593,66 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
               </div>
             </div>
 
-            {/* Assignees */}
-            <div>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">Assignees</span>
-              <div className="space-y-1.5">
-                {task.assigneeIds.map(uid => {
-                  const u = users.find(x => x.id === uid);
-                  if (!u) return null;
-                  return (
-                    <div key={u.id} className="flex items-center gap-2">
-                      <UserAvatar name={u.name} avatarUrl={u.avatarUrl} size="xs" />
-                      <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">{u.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Tags */}
             <div>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">Tags</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Tags</span>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingTag(prev => !prev)}
+                  className="text-[10px] text-neutral-500 hover:text-black dark:hover:text-white font-mono flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" /> Add Tag
+                </button>
+              </div>
+
+              {isAddingTag && (
+                <div className="mb-2">
+                  <select
+                    onChange={async (e) => {
+                      if (e.target.value) {
+                        await attachTagToEntity(e.target.value, 'task', task.id);
+                        setIsAddingTag(false);
+                      }
+                    }}
+                    defaultValue=""
+                    className="w-full p-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono"
+                  >
+                    <option value="" disabled>-- Select Tag to Attach --</option>
+                    {tags.filter(t => !task.tagIds.includes(t.id)).map(t => (
+                      <option key={t.id} value={t.id}>#{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-1.5">
+                {task.tagIds.length === 0 && !isAddingTag && (
+                  <span className="text-[11px] text-neutral-400 italic font-mono">No tags attached</span>
+                )}
                 {task.tagIds.map(tid => {
-                  const tg = tags.find(x => x.id === tid);
-                  if (!tg) return null;
+                  const tg = tags.find(x => x.id === tid) || { id: tid, name: tid, colorHex: '#3B82F6', bgHex: 'rgba(59,130,246,0.1)', textHex: '#3B82F6' };
                   return (
-                    <span key={tg.id} className="px-2.5 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1" style={{ backgroundColor: tg.bgHex, color: tg.textHex, borderColor: 'transparent' }}>
+                    <span 
+                      key={tg.id} 
+                      className="px-2.5 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 group/tag" 
+                      style={{ backgroundColor: tg.bgHex, color: tg.textHex, borderColor: 'transparent' }}
+                    >
                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tg.colorHex }} />
-                      {tg.name}
+                      #{tg.name}
+                      <button
+                        type="button"
+                        onClick={() => detachTagFromEntity(tg.id, 'task', task.id)}
+                        className="opacity-60 hover:opacity-100 hover:text-red-600 ml-0.5 cursor-pointer"
+                        title="Remove tag from task"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
                     </span>
                   );
                 })}
               </div>
             </div>
-
-            {/* Dependencies */}
-            {task.dependencyTaskIds.length > 0 && (
-              <div>
-                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">Dependencies</span>
-                <div className="space-y-1 text-[11px]">
-                  {task.dependencyTaskIds.map(depId => (
-                    <div key={depId} className="flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300">
-                      <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
-                      <span>Linked to {depId}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

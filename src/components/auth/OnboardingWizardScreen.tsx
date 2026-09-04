@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Code, Compass, TrendingUp, LayoutGrid, User, Mail, Lock, Building2, Users, Loader2 } from 'lucide-react';
+import { Check, Code, Compass, TrendingUp, LayoutGrid, User, Mail, Lock, Building2, Users, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { WorkflowTemplate } from '../../types';
 
@@ -241,8 +241,9 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
 
       {/* Global Error Banner */}
       {error && (
-        <div className="w-full max-w-2xl mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold text-center">
-          ⚠️ {error}
+        <div className="w-full max-w-2xl mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-mono font-semibold flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -532,8 +533,8 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
       {/* Step 4: Finalize & Launch */}
       {step === 4 && (
         <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 flex items-center justify-center mx-auto text-xl font-bold">
-            ✓
+          <div className="w-12 h-12 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 flex items-center justify-center mx-auto">
+            <Check className="w-6 h-6 stroke-[3]" />
           </div>
           <div>
             <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 4 of 4</span>

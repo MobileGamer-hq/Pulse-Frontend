@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, Check, Info, Users, Briefcase, Target, Tag, FileText, Settings } from 'lucide-react';
+import { X, ShieldCheck, Check, Info, Users, Briefcase, Target, Tag, FileText, Settings, Minus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Role } from '../../types';
 
@@ -259,63 +259,63 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                   <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800 text-neutral-900 dark:text-neutral-100">
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-neutral-400" /> Create Projects</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-neutral-400" /> Create Tasks</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-neutral-400" /> Manage Goals &amp; OKRs</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-neutral-400" /> Create System Tags</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-neutral-400" /> Manage Team Members</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Settings className="w-3.5 h-3.5 text-neutral-400" /> Admin &amp; Security Controls</td>
-                      <td className="p-2.5 text-center text-green-600 font-bold">✓</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700">✕</td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                   </tbody>
                 </table>

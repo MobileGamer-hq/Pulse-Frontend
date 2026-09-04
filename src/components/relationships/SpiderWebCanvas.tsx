@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   ZoomIn, ZoomOut, Link2, Check, 
   User as UserIcon, Grid, MousePointer, 
-  SlidersHorizontal, LayoutGrid
+  SlidersHorizontal, LayoutGrid, Network
 } from 'lucide-react';
 import type { EntityType, Team, Project, Task, Goal, User as UserType } from '../../types';
 
@@ -45,7 +45,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
   onSelectNode,
   searchQuery = ''
 }) => {
-  const { teams, projects, users, tasks, goals, tags, eodEntries, updateTask, updateProject, isDarkMode } = useApp();
+  const { teams, projects, users, tasks, goals, tags, eodEntries, updateTask, updateProject, isDarkMode, currentOrgSlug } = useApp();
 
   // Canvas viewport camera state
   const [zoom, setZoom] = useState(0.75);
@@ -114,12 +114,16 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
     const RING_GOALS = 860;    // Ring 5: Goals / OKRs
 
     // Ring 0: Central Org Core
+    const orgDisplayName = currentOrgSlug 
+      ? currentOrgSlug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+      : 'Workspace Core';
+
     nodesMap.set('core-org', {
       id: 'core-org',
-      entityId: 'org-acme',
+      entityId: currentOrgSlug || 'org-core',
       type: 'team',
-      label: 'Pulse Org Core',
-      sublabel: 'Acme Central Hub',
+      label: orgDisplayName,
+      sublabel: 'Organization Hub',
       x: customPositions['core-org']?.x ?? 0,
       y: customPositions['core-org']?.y ?? 0,
       vx: 0, vy: 0,
@@ -634,7 +638,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
       {/* Spider Web Layer Badge */}
       <div className="absolute top-4 left-4 z-40 flex items-center gap-3">
         <div className="px-3.5 py-1.5 rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 backdrop-blur-md shadow-xl flex items-center gap-2">
-          <span className="text-base">🕸️</span>
+          <Network className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
           <div>
             <h2 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight">Spider Web Topology</h2>
             <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">Version 3 • Concentric Layers</p>
@@ -866,7 +870,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                     className="cursor-pointer select-none"
                   >
                     <circle r="13" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2.5" className="drop-shadow-md" />
-                    <text textAnchor="middle" dy="4" fill="#FFFFFF" fontSize="11" fontWeight="bold" pointerEvents="none">✕</text>
+                    <text textAnchor="middle" dy="3.5" fill="#FFFFFF" fontSize="11" fontWeight="bold" pointerEvents="none">✕</text>
                   </g>
                 )}
               </g>
@@ -945,9 +949,11 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                 {node.level === 0 && (
                   <g>
                     <circle r={node.radius} fill={isDarkMode ? '#1E1B4B' : '#EEF2FF'} stroke="#6366F1" strokeWidth="3" className="drop-shadow-xl" />
-                    <text textAnchor="middle" dy="-3" fill={isDarkMode ? '#FFFFFF' : '#1E1B4B'} fontSize="11" fontWeight="bold" fontFamily="monospace">ACME</text>
+                    <text textAnchor="middle" dy="-3" fill={isDarkMode ? '#FFFFFF' : '#1E1B4B'} fontSize="11" fontWeight="bold" fontFamily="monospace">
+                      {node.label.length > 8 ? node.label.substring(0, 8).toUpperCase() : node.label.toUpperCase()}
+                    </text>
                     <text textAnchor="middle" dy="10" fill={isDarkMode ? '#A5B4FC' : '#4F46E5'} fontSize="8" fontWeight="bold" fontFamily="monospace">CORE</text>
-                    <text textAnchor="middle" dy={node.radius + 18} fill={isDarkMode ? '#F5F5F5' : '#171717'} fontSize="11" fontWeight="bold">Acme Organization</text>
+                    <text textAnchor="middle" dy={node.radius + 18} fill={isDarkMode ? '#F5F5F5' : '#171717'} fontSize="11" fontWeight="bold">{node.label}</text>
                   </g>
                 )}
 
@@ -1051,7 +1057,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                   transform={`translate(${node.radius + 6}, -${node.radius + 6})`}
                 >
                   <circle r="11" fill={connectingSourceId === node.id ? '#10B981' : '#3B82F6'} stroke="#FFFFFF" strokeWidth="2" className="drop-shadow-md" />
-                  <text textAnchor="middle" dy="3.5" fill="#FFFFFF" fontSize="10" fontWeight="bold">🔗</text>
+                  <text textAnchor="middle" dy="3.5" fill="#FFFFFF" fontSize="11" fontWeight="bold">+</text>
                 </g>
               </g>
             );

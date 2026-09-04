@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
 import { SpiderWebCanvas } from './SpiderWebCanvas';
 import { NodeDetailPopupCard } from './NodeDetailPopupCard';
-import { ArrowLeft, Search, Plus } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Network } from 'lucide-react';
 
 export const SpiderWebRelationshipsScreen: React.FC = () => {
   const { setActiveScreen } = useApp();
@@ -36,7 +36,7 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
           </button>
           <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-800" />
           <div className="flex items-center gap-2">
-            <span className="text-base">🕸️</span>
+            <Network className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
             <div>
               <h1 className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
                 Spider Web Canvas

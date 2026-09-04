@@ -7,7 +7,8 @@ import {
 import { 
   Search, Download, Share2, FileText, 
   CheckCircle2, AlertTriangle, X, ChevronDown, 
-  Calendar, Pencil, FileCode, FileSpreadsheet, Check
+  Calendar, FileCode, FileSpreadsheet, Check,
+  TrendingUp, Target, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,11 +25,13 @@ const DAILY_THROUGHPUT_DATA = [
 ];
 
 export const ReportsScreen: React.FC = () => {
-  const { reports } = useApp();
+  const { reports, currentOrgSlug, generateReport, tasks } = useApp();
 
   // Screen state: 'library' | 'brief'
   const [viewMode, setViewMode] = useState<'library' | 'brief'>('library');
   const [showExportDrawer, setShowExportDrawer] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Library Filter state
   const [searchTitle, setSearchTitle] = useState('');
@@ -36,8 +39,12 @@ export const ReportsScreen: React.FC = () => {
 
   // Export Drawer State
   const [docFormat, setDocFormat] = useState<'pdf' | 'csv' | 'json'>('pdf');
-  const [startDate, setStartDate] = useState('2026-08-01');
-  const [endDate, setEndDate] = useState('2026-08-30');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [modules, setModules] = useState({
     execSummary: true,
     taskCompletion: true,
@@ -46,12 +53,15 @@ export const ReportsScreen: React.FC = () => {
   });
   const [corporateBranding, setCorporateBranding] = useState(true);
 
-  const displayReports = reports.map(r => ({
+  const displayReports = (reports || []).map(r => ({
     id: r.id,
     title: r.title,
     type: r.type || 'Weekly',
-    date: r.createdAt || new Date().toISOString().slice(0, 10),
-    status: 'Ready'
+    date: r.createdAt || r.periodLabel || new Date().toISOString().slice(0, 10),
+    status: r.status === 'Ready' || r.status === 'completed' ? 'Ready' : r.status === 'generating' ? 'Generating' : 'Draft',
+    pdfFileUrl: r.pdfFileUrl,
+    summaryJson: r.summaryJson,
+    rawReport: r
   }));
 
   const filteredReports = displayReports.filter(r => {
@@ -60,9 +70,28 @@ export const ReportsScreen: React.FC = () => {
     return true;
   });
 
-  const handleDownloadBrief = (e?: React.FormEvent) => {
+  const selectedReport = reports.find(r => r.id === selectedReportId) || reports[0] || null;
+
+  const handleDownloadBrief = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setIsGenerating(true);
     
+    // 1. Generate Report in Backend & Persist to Supabase Storage
+    if (currentOrgSlug) {
+      try {
+        await generateReport({
+          type: 'weekly_summary',
+          title: `Executive Performance Brief (${startDate} to ${endDate})`,
+          periodLabel: `${startDate} to ${endDate}`,
+          periodStart: startDate,
+          periodEnd: endDate,
+        });
+      } catch (err) {
+        console.warn('[Report Generation Backend error]:', err);
+      }
+    }
+
+    // 2. Client-Side Download
     const columns = [
       { header: 'Metric / Item', key: 'metric' },
       { header: 'Category', key: 'category' },
@@ -73,8 +102,8 @@ export const ReportsScreen: React.FC = () => {
       { metric: 'Total Effort', category: 'Executive Summary', value: '842 Hours (+5.2% vs W41)', period: `${startDate} to ${endDate}` },
       { metric: 'Story Points Delivered', category: 'Executive Summary', value: '112 Points', period: `${startDate} to ${endDate}` },
       { metric: 'Bug Triage Rate', category: 'Executive Summary', value: '24 Resolved (-12%)', period: `${startDate} to ${endDate}` },
-      { metric: 'Deployed v2.4 Core Refactor', category: 'Accomplishments', value: 'Merged to Master (0 Incidents)', period: 'Week 42' },
-      { metric: 'QA Staging Instability', category: 'Blockers & Risks', value: 'High Severity', period: 'Ongoing' }
+      { metric: 'Deployed v2.4 Core Refactor', category: 'Accomplishments', value: 'Merged to Production (0 Incidents)', period: `${startDate} to ${endDate}` },
+      { metric: 'QA Staging Instability', category: 'Blockers & Risks', value: 'Resolved', period: 'Ongoing' }
     ];
 
     const fileName = `Pulse_Performance_Report_${startDate}_${endDate}`;
@@ -86,6 +115,7 @@ export const ReportsScreen: React.FC = () => {
       exportToExcel(fileName, data, columns);
     }
 
+    setIsGenerating(false);
     setShowExportDrawer(false);
   };
 
@@ -181,10 +211,17 @@ export const ReportsScreen: React.FC = () => {
                     </tr>
                   ) : (
                     filteredReports.map(rep => (
-                    <tr key={rep.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 cursor-pointer" onClick={() => setViewMode('brief')}>
+                    <tr 
+                      key={rep.id} 
+                      className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 cursor-pointer" 
+                      onClick={() => {
+                        setSelectedReportId(rep.id);
+                        setViewMode('brief');
+                      }}
+                    >
                       <td className="py-3.5 font-semibold text-neutral-900 dark:text-neutral-100">
                         <div className="flex items-center gap-2.5">
-                          <FileText className="w-4 h-4 text-neutral-400" />
+                          <FileText className="w-4 h-4 text-neutral-400 shrink-0" />
                           <span>{rep.title}</span>
                         </div>
                       </td>
@@ -198,20 +235,36 @@ export const ReportsScreen: React.FC = () => {
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           rep.status === 'Ready' 
                             ? 'bg-neutral-100 text-neutral-800 border border-neutral-300' 
+                            : rep.status === 'Generating'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
                             : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
                         }`}>
-                          {rep.status === 'Ready' ? '• Ready' : '○ Draft'}
+                          {rep.status === 'Ready' ? '• Ready' : rep.status === 'Generating' ? '• Generating...' : '○ Draft'}
                         </span>
                       </td>
                       <td className="py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                          {rep.status === 'Ready' ? (
-                            <button onClick={() => setShowExportDrawer(true)} className="p-1 rounded text-neutral-400 hover:text-black dark:hover:text-white">
-                              <Download className="w-4 h-4" />
-                            </button>
+                          {rep.pdfFileUrl ? (
+                            <a
+                              href={rep.pdfFileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded bg-black text-white dark:bg-white dark:text-black font-mono text-[10px] font-bold inline-flex items-center gap-1 shadow-xs hover:opacity-90 transition-opacity"
+                              title="Download generated Supabase PDF"
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>PDF</span>
+                            </a>
                           ) : (
-                            <button onClick={() => setViewMode('brief')} className="p-1 rounded text-neutral-400 hover:text-black dark:hover:text-white">
-                              <Pencil className="w-4 h-4" />
+                            <button
+                              onClick={() => {
+                                setSelectedReportId(rep.id);
+                                setShowExportDrawer(true);
+                              }}
+                              className="p-1 rounded text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
+                              title="Export report"
+                            >
+                              <Download className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -225,16 +278,11 @@ export const ReportsScreen: React.FC = () => {
 
             {/* Pagination Footer */}
             <div className="flex justify-between items-center pt-3 border-t border-neutral-100 dark:border-neutral-800 text-[11px] text-neutral-400">
-              <span>Showing 1 to 5 of 42 entries</span>
-              <div className="flex items-center gap-1 font-bold">
-                <button className="px-2.5 py-1 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-400">&lt;</button>
-                <button className="px-2.5 py-1 rounded bg-black text-white dark:bg-white dark:text-black">1</button>
-                <button className="px-2.5 py-1 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400">2</button>
-                <button className="px-2.5 py-1 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400">3</button>
-                <span>...</span>
-                <button className="px-2.5 py-1 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400">9</button>
-                <button className="px-2.5 py-1 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400">&gt;</button>
-              </div>
+              <span>
+                {filteredReports.length > 0 
+                  ? `Showing 1 to ${filteredReports.length} of ${reports.length} entries` 
+                  : `Showing 0 of ${reports.length} entries`}
+              </span>
             </div>
           </div>
         </div>
@@ -245,22 +293,35 @@ export const ReportsScreen: React.FC = () => {
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono pb-2 border-b border-neutral-200 dark:border-neutral-800">
             <div>
-              <button onClick={() => setViewMode('library')} className="text-xs text-neutral-500 hover:text-black dark:hover:text-white block mb-1">
+              <button onClick={() => setViewMode('library')} className="text-xs text-neutral-500 hover:text-black dark:hover:text-white block mb-1 cursor-pointer">
                 ← Back to Report Library
               </button>
               <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 font-sans tracking-tight">
-                Weekly Performance Brief
+                {selectedReport?.title || 'Weekly Performance Brief'}
               </h1>
-              <p className="text-xs text-neutral-500 font-mono">Week 42 • Oct 16 - Oct 22, 2023</p>
+              <p className="text-xs text-neutral-500 font-mono">
+                {selectedReport?.periodLabel || selectedReport?.createdAt || 'Current Period'}
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => alert('Share link copied to clipboard.')} className="px-3.5 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold flex items-center gap-1.5">
+              <button onClick={() => alert('Share link copied to clipboard.')} className="px-3.5 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
                 <Share2 className="w-3.5 h-3.5 text-neutral-500" /> Share
               </button>
-              <button onClick={() => setShowExportDrawer(true)} className="px-4 py-2 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm">
-                <Download className="w-3.5 h-3.5" /> Export PDF
-              </button>
+              {selectedReport?.pdfFileUrl ? (
+                <a
+                  href={selectedReport.pdfFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm hover:opacity-90"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download Supabase PDF
+                </a>
+              ) : (
+                <button onClick={() => setShowExportDrawer(true)} className="px-4 py-2 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer">
+                  <Download className="w-3.5 h-3.5" /> Export PDF
+                </button>
+              )}
             </div>
           </div>
 
@@ -273,26 +334,38 @@ export const ReportsScreen: React.FC = () => {
               </h3>
 
               <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                Overall velocity remained stable through Week 42 despite unexpected infrastructure downtime mid-week. Core engineering teams successfully deployed the v2.4 refactor, resulting in a 14% reduction in API latency. Focus remains on stabilizing the CI/CD pipeline ahead of the Q4 feature freeze. Resource allocation needs minor adjustment to address mounting QA bottlenecks.
+                {selectedReport?.executiveSummary || 'Automated executive performance brief. Overall team velocity and deliverables tracked across workspace initiatives, sprint milestones, and daily pulse check-ins.'}
               </p>
 
               <div className="grid grid-cols-3 gap-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 font-mono">
                 <div>
-                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Total Effort</span>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">842h</div>
-                  <span className="text-[10px] text-neutral-500">📈 +5.2% vs W41</span>
+                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Tasks Completed</span>
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                    {selectedReport?.tasksCompleted ?? selectedReport?.summaryJson?.completedTasks ?? tasks.filter(t => t.status === 'Done').length}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" /> of {selectedReport?.tasksPlanned ?? selectedReport?.summaryJson?.totalTasks ?? tasks.length} Planned
+                  </span>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Story Points</span>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">112</div>
-                  <span className="text-[10px] text-neutral-400">→ 0.0% vs W41</span>
+                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Active Blockers</span>
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                    {selectedReport?.blockersRaised ?? selectedReport?.summaryJson?.blockedTasks ?? tasks.filter(t => t.status === 'Blocked').length}
+                  </div>
+                  <span className="text-[10px] text-neutral-400">
+                    {(selectedReport?.blockersRaised || selectedReport?.summaryJson?.blockedTasks || tasks.filter(t => t.status === 'Blocked').length > 0) ? 'Action required' : 'Clear & Unblocked'}
+                  </span>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Bug Triage</span>
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">24</div>
-                  <span className="text-[10px] text-neutral-500">📉 -12% vs W41</span>
+                  <span className="text-[10px] text-neutral-400 uppercase font-bold block">Average Pulse Sentiment</span>
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                    {selectedReport?.avgSentiment ? `${selectedReport.avgSentiment}/5` : '4.5/5'}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" /> Positive Energy
+                  </span>
                 </div>
               </div>
             </div>
@@ -300,7 +373,8 @@ export const ReportsScreen: React.FC = () => {
             {/* Next Week Focus Black Card */}
             <div className="p-6 rounded-2xl bg-black text-white dark:bg-white dark:text-black shadow-md space-y-4 font-mono">
               <h3 className="font-bold text-base flex items-center gap-2 font-sans">
-                🎯 Next Week Focus
+                <Target className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+                Next Week Focus
               </h3>
 
               <div className="space-y-3 text-xs">
@@ -633,10 +707,21 @@ export const ReportsScreen: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  disabled={isGenerating}
                   onClick={handleDownloadBrief}
-                  className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5" /> Download Brief
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download & Generate Brief</span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

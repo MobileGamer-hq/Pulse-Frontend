@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, CheckCircle2, Lock, FileText, Briefcase, Target, Tag as TagIcon, UserPlus, Users } from 'lucide-react';
+import { X, Plus, CheckCircle2, Lock, FileText, Briefcase, Target, Tag as TagIcon, UserPlus, Users, AlertTriangle, ArrowRight, Loader2, Check, ExternalLink, Info } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { organizationService } from '../../services/organizationService';
 import type { Role, Priority, TaskStatus, WorkflowTemplate } from '../../types';
 
 export type ItemType = 'task' | 'project' | 'goal' | 'tag' | 'member' | 'team';
@@ -12,24 +13,221 @@ interface CreateItemModalProps {
   onClose: () => void;
 }
 
+const ITEM_META: Record<ItemType, { title: string; icon: React.FC<{ className?: string }> }> = {
+  task: { title: 'Create New Task', icon: FileText },
+  project: { title: 'Create New Project', icon: Briefcase },
+  goal: { title: 'Create Strategic Goal', icon: Target },
+  team: { title: 'Create New Team', icon: Users },
+  member: { title: 'Invite Team Member', icon: UserPlus },
+  tag: { title: 'Create Tag', icon: TagIcon }
+};
+
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   isOpen,
   initialType = 'task',
   onClose
 }) => {
   const { 
-    activeRole, setActiveRole, currentUser, projects, teams, users,
+    activeRole, setActiveRole, currentUser, currentOrgSlug, projects, teams, users,
     addTask, addProject, addGoal, addTag, addUser, addTeam 
   } = useApp();
 
   const [itemType, setItemType] = useState<ItemType>(initialType);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [generatedInvite, setGeneratedInvite] = useState<{ token: string; inviteLink: string; email: string; role: string } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Sync initialType when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setItemType(initialType);
+      setSuccessMessage(null);
+      setSubmitError(null);
+      setGeneratedInvite(null);
+      setCopiedLink(false);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, initialType]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentPrerequisite && !currentPrerequisite.met) return;
+    if (!currentPermission.allowed) return;
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      const activeOrg = currentOrgSlug || 'epicordia';
+      if (itemType === 'task') {
+        if (!taskTitle.trim()) {
+          setSubmitError('Please enter a task title.');
+          setIsSubmitting(false);
+          return;
+        }
+        const targetProjId = taskProjectId || projects[0]?.id;
+        const proj = projects.find(p => p.id === targetProjId);
+        await addTask({
+          orgId: activeOrg,
+          projectId: targetProjId,
+          projectName: proj ? proj.name : 'Core Project',
+          title: taskTitle.trim(),
+          description: taskDescription,
+          status: taskStatus,
+          priority: taskPriority,
+          assigneeIds: [taskAssigneeId || currentUser.id],
+          estimatedHours: taskEstimatedHours || 4,
+          actualHours: 0,
+          dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+          startDate: new Date().toISOString().split('T')[0],
+          tagIds: [],
+          dependencyTaskIds: [],
+          subtasks: taskSubtasks.map((st, idx) => ({
+            id: `sub-${Date.now()}-${idx}`,
+            title: st.title,
+            done: false,
+            assigneeId: st.assigneeId
+          })),
+          comments: []
+        });
+        setSuccessMessage(`Task "${taskTitle}" saved to database successfully!`);
+      } else if (itemType === 'project') {
+        if (!projectName.trim()) {
+          setSubmitError('Please enter a project name.');
+          setIsSubmitting(false);
+          return;
+        }
+        const targetTeamId = projectTeamId || teams[0]?.id;
+        await addProject({
+          orgId: activeOrg,
+          name: projectName.trim(),
+          description: projectDescription,
+          templateType: projectTemplate,
+          teamId: targetTeamId,
+          leadId: currentUser.id,
+          memberIds: [currentUser.id],
+          tagIds: [],
+          linkedGoalIds: [],
+          startDate: new Date().toISOString().split('T')[0],
+          targetEndDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+          status: 'Active'
+        });
+        setSuccessMessage(`Project "${projectName}" saved to database successfully!`);
+      } else if (itemType === 'goal') {
+        if (!goalTitle.trim()) {
+          setSubmitError('Please enter a goal title.');
+          setIsSubmitting(false);
+          return;
+        }
+        await addGoal({
+          orgId: activeOrg,
+          title: goalTitle.trim(),
+          description: goalDescription,
+          ownerType: goalOwnerType,
+          ownerId: currentUser.id,
+          ownerName: currentUser.name,
+          keyResults: [
+            { id: `kr-${Date.now()}`, title: 'Initial milestone delivery', targetValue: 100, currentValue: 25, unit: '%', linkedTaskIds: [] }
+          ],
+          linkedTaskIds: [],
+          tagIds: [],
+          targetDate: goalTargetDate || new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0],
+          status: 'OnTrack'
+        });
+        setSuccessMessage(`Goal "${goalTitle}" saved to database successfully!`);
+      } else if (itemType === 'tag') {
+        if (!tagName.trim()) {
+          setSubmitError('Please enter a tag name.');
+          setIsSubmitting(false);
+          return;
+        }
+        await addTag({
+          orgId: activeOrg,
+          name: tagName.trim(),
+          colorHex: tagColorHex,
+          bgHex: `${tagColorHex}20`,
+          textHex: tagColorHex,
+          appliesTo: ['task', 'project', 'person', 'goal'],
+          description: tagDescription,
+          createdBy: currentUser.name
+        });
+        setSuccessMessage(`Tag "#${tagName}" created successfully!`);
+      } else if (itemType === 'member') {
+        if (!memberName.trim() || !memberEmail.trim()) {
+          setSubmitError('Please enter member name and email.');
+          setIsSubmitting(false);
+          return;
+        }
+        const targetTeamId = memberTeamId || teams[0]?.id;
+        const team = teams.find(t => t.id === targetTeamId);
+        
+        // 1. Call Backend API to generate invitation token & link
+        const inviteRes = await organizationService.createInvite(currentOrgSlug, {
+          email: memberEmail.trim(),
+          role: memberRole,
+          teamId: targetTeamId,
+        });
+
+        addUser({
+          orgId: currentOrgSlug,
+          name: memberName,
+          email: memberEmail,
+          role: memberRole,
+          teamId: targetTeamId,
+          teamName: team ? team.name : 'Core Team',
+          title: memberTitle || `${memberRole} Specialist`,
+          avatarUrl: undefined,
+          activeProjectIds: [],
+          capacityHoursPerWeek: 40
+        });
+
+        if (inviteRes?.token && inviteRes?.inviteLink) {
+          setGeneratedInvite({
+            token: inviteRes.token,
+            inviteLink: inviteRes.inviteLink,
+            email: memberEmail.trim(),
+            role: memberRole,
+          });
+          setIsSubmitting(false);
+          return; // Remain in modal showing the token and link
+        }
+
+        setSuccessMessage(`Team Member "${memberName}" invited as ${memberRole}!`);
+      } else if (itemType === 'team') {
+        if (!newTeamName.trim()) {
+          setSubmitError('Please enter a team name.');
+          setIsSubmitting(false);
+          return;
+        }
+        const leadUser = users.find(u => u.id === newTeamLeadId);
+        await addTeam({
+          name: newTeamName,
+          leadId: newTeamLeadId,
+          leadName: leadUser ? leadUser.name : currentUser.name,
+          memberIds: [newTeamLeadId],
+          workflowTemplate: newTeamTemplate
+        });
+        setSuccessMessage(`Team "${newTeamName}" created & saved to database successfully!`);
+      }
+
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setIsSubmitting(false);
+        onClose();
+      }, 200);
+    } catch (err: any) {
+      setSubmitError(err.message || 'Database Save Error. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
 
   // Form states
   // Task state
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
-  const [taskProjectId, setTaskProjectId] = useState(projects[0]?.id || 'proj-1');
+  const [taskProjectId, setTaskProjectId] = useState(projects[0]?.id || '');
   const [taskPriority, setTaskPriority] = useState<Priority>('Medium');
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('Todo');
   const [taskEstimatedHours, setTaskEstimatedHours] = useState<number>(8);
@@ -42,7 +240,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [projectTemplate, setProjectTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
-  const [projectTeamId, setProjectTeamId] = useState(teams[0]?.id || 'team-eng');
+  const [projectTeamId, setProjectTeamId] = useState(teams[0]?.id || '');
 
   // Goal state
   const [goalTitle, setGoalTitle] = useState('');
@@ -60,14 +258,89 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState<Role>('Member');
   const [memberTitle, setMemberTitle] = useState('');
-  const [memberTeamId, setMemberTeamId] = useState(teams[0]?.id || 'team-eng');
+  const [memberTeamId, setMemberTeamId] = useState(teams[0]?.id || '');
 
   // Team state
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamLeadId, setNewTeamLeadId] = useState<string>(currentUser.id);
   const [newTeamTemplate, setNewTeamTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
 
+  // Sync selection IDs when data collections change
+  useEffect(() => {
+    if (projects.length > 0 && (!taskProjectId || !projects.some(p => p.id === taskProjectId))) {
+      setTaskProjectId(projects[0].id);
+    }
+  }, [projects]);
+
+  useEffect(() => {
+    if (teams.length > 0) {
+      if (!projectTeamId || !teams.some(t => t.id === projectTeamId)) {
+        setProjectTeamId(teams[0].id);
+      }
+      if (!memberTeamId || !teams.some(t => t.id === memberTeamId)) {
+        setMemberTeamId(teams[0].id);
+      }
+    }
+  }, [teams]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskSubtasks([]);
+      setNewModalSubtaskTitle('');
+      setNewModalSubtaskAssigneeId('');
+      setProjectName('');
+      setProjectDescription('');
+      setGoalTitle('');
+      setGoalDescription('');
+      setTagName('');
+      setTagDescription('');
+      setMemberName('');
+      setMemberEmail('');
+      setNewTeamName('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  // Prerequisite Hierarchy Dependency Validation Checks
+  const checkPrerequisites = (type: ItemType): { met: boolean; title: string; message: string; requiredType: ItemType; buttonText: string } | null => {
+    if (type === 'task') {
+      if (teams.length === 0) {
+        return {
+          met: false,
+          title: 'Prerequisite Required: No Teams Found',
+          message: 'Before creating a Task, your workspace needs at least one Team and a Project.',
+          requiredType: 'team',
+          buttonText: '+ Create a Team First'
+        };
+      }
+      if (projects.length === 0) {
+        return {
+          met: false,
+          title: 'Prerequisite Required: No Active Projects Found',
+          message: 'Tasks must be assigned to an active project. Please create a Project first before adding a task.',
+          requiredType: 'project',
+          buttonText: '+ Create a Project First'
+        };
+      }
+    }
+
+    if (type === 'project') {
+      if (teams.length === 0) {
+        return {
+          met: false,
+          title: 'Prerequisite Required: No Teams Found',
+          message: 'Projects must be assigned to a team workspace. Please create a Team first before adding a project.',
+          requiredType: 'team',
+          buttonText: '+ Create a Team First'
+        };
+      }
+    }
+
+    return null;
+  };
 
   // RBAC Permission Validation Rule Matrix
   const checkPermission = (type: ItemType): { allowed: boolean; reason: string } => {
@@ -119,121 +392,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
     }
   };
 
+  const currentPrerequisite = checkPrerequisites(itemType);
   const currentPermission = checkPermission(itemType);
+  const MetaIcon = ITEM_META[itemType]?.icon || Plus;
+  const metaTitle = ITEM_META[itemType]?.title || 'Add New Item';
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPermission.allowed) return;
 
-    if (itemType === 'task') {
-      if (!taskTitle.trim()) return;
-      const proj = projects.find(p => p.id === taskProjectId);
-      addTask({
-        orgId: 'org-acme',
-        projectId: taskProjectId,
-        projectName: proj ? proj.name : 'Core Project',
-        title: taskTitle,
-        description: taskDescription,
-        status: taskStatus,
-        priority: taskPriority,
-        assigneeIds: [taskAssigneeId],
-        estimatedHours: taskEstimatedHours,
-        actualHours: 0,
-        dueDate: '2026-08-30',
-        startDate: '2026-08-16',
-        tagIds: ['tag-1'],
-        dependencyTaskIds: [],
-        subtasks: taskSubtasks.map((st, idx) => ({
-          id: `sub-${Date.now()}-${idx}`,
-          title: st.title,
-          done: false,
-          assigneeId: st.assigneeId
-        })),
-        comments: []
-      });
-      setSuccessMessage(`Task "${taskTitle}" created successfully under privilege ${activeRole}!`);
-    } else if (itemType === 'project') {
-      if (!projectName.trim()) return;
-      addProject({
-        orgId: 'org-acme',
-        name: projectName,
-        description: projectDescription,
-        templateType: projectTemplate,
-        teamId: projectTeamId,
-        leadId: currentUser.id,
-        memberIds: [currentUser.id],
-        tagIds: ['tag-1'],
-        linkedGoalIds: [],
-        startDate: new Date().toISOString().split('T')[0],
-        targetEndDate: '2026-10-31',
-        status: 'Active'
-      });
-      setSuccessMessage(`Project "${projectName}" created successfully under privilege ${activeRole}!`);
-    } else if (itemType === 'goal') {
-      if (!goalTitle.trim()) return;
-      addGoal({
-        orgId: 'org-acme',
-        title: goalTitle,
-        description: goalDescription,
-        ownerType: goalOwnerType,
-        ownerId: currentUser.id,
-        ownerName: currentUser.name,
-        keyResults: [
-          { id: `kr-${Date.now()}`, title: 'Initial milestone delivery', targetValue: 100, currentValue: 25, unit: '%', linkedTaskIds: [] }
-        ],
-        linkedTaskIds: [],
-        tagIds: [],
-        targetDate: goalTargetDate,
-        status: 'OnTrack'
-      });
-      setSuccessMessage(`Goal "${goalTitle}" created successfully under privilege ${activeRole}!`);
-    } else if (itemType === 'tag') {
-      if (!tagName.trim()) return;
-      addTag({
-        orgId: 'org-acme',
-        name: tagName,
-        colorHex: tagColorHex,
-        bgHex: `${tagColorHex}20`,
-        textHex: tagColorHex,
-        appliesTo: ['task', 'project'],
-        description: tagDescription,
-        createdBy: currentUser.name
-      });
-      setSuccessMessage(`Tag "#${tagName}" created successfully under privilege ${activeRole}!`);
-    } else if (itemType === 'member') {
-      if (!memberName.trim() || !memberEmail.trim()) return;
-      const team = teams.find(t => t.id === memberTeamId);
-      addUser({
-        orgId: 'org-acme',
-        name: memberName,
-        email: memberEmail,
-        role: memberRole,
-        teamId: memberTeamId,
-        teamName: team ? team.name : 'Core Team',
-        title: memberTitle || `${memberRole} Specialist`,
-        avatarUrl: undefined,
-        activeProjectIds: [],
-        capacityHoursPerWeek: 40
-      });
-      setSuccessMessage(`Team Member "${memberName}" invited as ${memberRole} under privilege ${activeRole}!`);
-    } else if (itemType === 'team') {
-      if (!newTeamName.trim()) return;
-      const leadUser = users.find(u => u.id === newTeamLeadId);
-      addTeam({
-        name: newTeamName,
-        leadId: newTeamLeadId,
-        leadName: leadUser ? leadUser.name : currentUser.name,
-        memberIds: [newTeamLeadId],
-        workflowTemplate: newTeamTemplate
-      });
-      setSuccessMessage(`Team "${newTeamName}" created successfully under privilege ${activeRole}!`);
-    }
-
-    setTimeout(() => {
-      setSuccessMessage(null);
-      onClose();
-    }, 1500);
-  };
 
   return (
     <AnimatePresence>
@@ -244,15 +408,15 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           exit={{ opacity: 0, y: 20 }}
           className="bg-white dark:bg-neutral-900 border-0 sm:border border-neutral-200 dark:border-neutral-800 rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-2xl overflow-hidden text-xs flex flex-col max-h-none sm:max-h-[90vh]"
         >
-          {/* Top Header */}
-          <div className="px-4 sm:px-6 py-3.5 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 shrink-0">
+          {/* Dedicated Header for Current Item Type */}
+          <div className="px-4 sm:px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold shrink-0">
-                <Plus className="w-4 h-4" />
+              <div className="w-9 h-9 rounded-xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold shrink-0 shadow-xs">
+                <MetaIcon className="w-4.5 h-4.5" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
-                  Add New Item
+                <h2 className="text-base font-extrabold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
+                  {metaTitle}
                 </h2>
                 <p className="text-[11px] text-neutral-500 font-mono truncate">
                   Role: <span className="font-bold text-neutral-900 dark:text-neutral-100">{activeRole}</span> ({currentUser.name})
@@ -262,57 +426,145 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors shrink-0"
+              className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Item Category Segmented Pill Tabs - Mobile Optimized */}
-          <div className="px-3 sm:px-6 py-2.5 bg-neutral-50/80 dark:bg-neutral-900/60 border-b border-neutral-200/80 dark:border-neutral-800 shrink-0 font-mono">
-            <div className="p-1 bg-neutral-200/70 dark:bg-neutral-800/80 rounded-xl flex items-center gap-1 overflow-x-auto border border-neutral-200/60 dark:border-neutral-700/50 scrollbar-none">
-              {[
-                { id: 'task' as ItemType, label: 'Task', icon: FileText },
-                { id: 'project' as ItemType, label: 'Project', icon: Briefcase },
-                { id: 'goal' as ItemType, label: 'Goal', icon: Target },
-                { id: 'team' as ItemType, label: 'Team', icon: Users },
-                { id: 'member' as ItemType, label: 'Member', icon: UserPlus },
-                { id: 'tag' as ItemType, label: 'Tag', icon: TagIcon }
-              ].map(tab => {
-                const Icon = tab.icon;
-                const isActive = itemType === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setItemType(tab.id)}
-                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 whitespace-nowrap ${
-                      isActive
-                        ? 'bg-white dark:bg-neutral-900 text-neutral-950 dark:text-neutral-100 font-bold shadow-xs border border-neutral-200/80 dark:border-neutral-700/60'
-                        : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-neutral-700/40'
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-neutral-900 dark:text-neutral-100' : 'text-neutral-400'}`} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Form Content */}
+          {/* Dedicated Form Content Body */}
           <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
-            {successMessage ? (
-              <div className="p-6 rounded-xl bg-green-50 text-green-900 dark:bg-green-950/40 dark:text-green-300 border border-green-200 dark:border-green-800 text-center space-y-2">
+            {generatedInvite ? (
+              /* Invitation Link & Token Generated View */
+              <div className="p-6 rounded-2xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 space-y-5 font-sans">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                      Invitation Token & Link Generated!
+                    </h3>
+                    <p className="text-xs text-neutral-500 font-mono">
+                      Invited <span className="font-bold text-neutral-900 dark:text-neutral-100">{generatedInvite.email}</span> with role <span className="font-bold text-neutral-900 dark:text-neutral-100">{generatedInvite.role}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-mono font-bold text-neutral-500 uppercase tracking-wider mb-1">
+                      Invitation Token
+                    </label>
+                    <div className="p-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100 select-all flex items-center justify-between">
+                      <code>{generatedInvite.token}</code>
+                      <span className="text-[10px] text-neutral-400 font-normal">Valid for 7 days</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono font-bold text-neutral-500 uppercase tracking-wider mb-1">
+                      Public Acceptance Link
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={generatedInvite.inviteLink}
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 font-mono text-xs select-all focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedInvite.inviteLink);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2500);
+                        }}
+                        className="px-4 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shrink-0 flex items-center gap-1.5"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Copied!
+                          </>
+                        ) : (
+                          'Copy Link'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 text-[11px] font-mono leading-relaxed flex items-start gap-2">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <strong>In-App Acceptance</strong>: When {generatedInvite.email} logs into Pulse, this workspace invitation will also appear directly in their workspace dashboard and switcher, allowing them to Accept or Decline with 1-click without needing the link.
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(generatedInvite.inviteLink, '_blank');
+                    }}
+                    className="px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    Open Acceptance Link
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeneratedInvite(null);
+                      onClose();
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : successMessage ? (
+              <div className="p-6 rounded-2xl bg-green-50 text-green-900 dark:bg-green-950/40 dark:text-green-300 border border-green-200 dark:border-green-800 text-center space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400 mx-auto" />
                 <h3 className="font-bold text-sm">{successMessage}</h3>
                 <p className="text-xs text-green-700 dark:text-green-400 font-mono">
-                  State updated in live app context. Closing modal...
+                  State updated in live app context. Closing popup...
                 </p>
+              </div>
+            ) : currentPrerequisite && !currentPrerequisite.met ? (
+              /* Prerequisite Dependency Alert Card */
+              <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-900 space-y-4 font-sans">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-extrabold text-sm tracking-tight text-amber-900 dark:text-amber-200">
+                      {currentPrerequisite.title}
+                    </h3>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 font-mono leading-relaxed">
+                      {currentPrerequisite.message}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-amber-200 dark:border-amber-800 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setItemType(currentPrerequisite.requiredType)}
+                    className="px-4 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>{currentPrerequisite.buttonText}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ) : !currentPermission.allowed ? (
               /* RBAC Restriction Alert Card */
-              <div className="p-5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800 space-y-4 font-sans">
+              <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800 space-y-4 font-sans">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 shrink-0">
                     <Lock className="w-5 h-5" />
@@ -333,14 +585,14 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveRole('Admin')}
-                      className="px-3 py-1 bg-amber-900 text-white dark:bg-amber-200 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity"
+                      className="px-3 py-1.5 bg-amber-900 text-white dark:bg-amber-200 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                     >
                       Switch to Admin Mode
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveRole('Manager')}
-                      className="px-3 py-1 bg-amber-800 text-white dark:bg-amber-300 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity"
+                      className="px-3 py-1.5 bg-amber-800 text-white dark:bg-amber-300 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                     >
                       Switch to Manager Mode
                     </button>
@@ -348,7 +600,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                 </div>
               </div>
             ) : (
-              /* Form input fields */
+              /* Dedicated Form Fields */
               <form onSubmit={handleSubmit} className="space-y-4 font-sans">
                 {itemType === 'task' && (
                   <>
@@ -360,17 +612,17 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={taskTitle}
                         onChange={e => setTaskTitle(e.target.value)}
                         placeholder="e.g. Implement WebSocket heartbeat reconnection listener"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100 font-sans"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Project</label>
+                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Target Project *</label>
                         <select
-                          value={taskProjectId}
+                          value={taskProjectId || (projects[0]?.id || '')}
                           onChange={e => setTaskProjectId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           {projects.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -383,7 +635,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={taskAssigneeId}
                           onChange={e => setTaskAssigneeId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           {users.map(u => (
                             <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
@@ -398,7 +650,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={taskPriority}
                           onChange={e => setTaskPriority(e.target.value as Priority)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="Urgent">Urgent</option>
                           <option value="High">High</option>
@@ -412,7 +664,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={taskStatus}
                           onChange={e => setTaskStatus(e.target.value as TaskStatus)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="Todo">To Do</option>
                           <option value="InProgress">In Progress</option>
@@ -428,7 +680,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           max={160}
                           value={taskEstimatedHours}
                           onChange={e => setTaskEstimatedHours(Number(e.target.value))}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         />
                       </div>
                     </div>
@@ -440,12 +692,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={taskDescription}
                         onChange={e => setTaskDescription(e.target.value)}
                         placeholder="Provide details and acceptance criteria..."
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none font-sans"
                       />
                     </div>
 
                     {/* Initial Subtasks breakdown section */}
-                    <div className="space-y-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                    <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                       <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
                         Subtasks Breakdown (Optional)
                       </label>
@@ -455,7 +707,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           {taskSubtasks.map((st, idx) => {
                             const subAssignee = users.find(u => u.id === st.assigneeId);
                             return (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-mono">
+                              <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-mono">
                                 <span className="text-neutral-800 dark:text-neutral-200 font-medium">{st.title}</span>
                                 <div className="flex items-center gap-2">
                                   {subAssignee ? (
@@ -466,7 +718,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => setTaskSubtasks(prev => prev.filter((_, i) => i !== idx))}
-                                    className="text-neutral-400 hover:text-red-600 font-bold ml-1"
+                                    className="text-neutral-400 hover:text-red-600 font-bold ml-1 cursor-pointer"
                                   >
                                     ×
                                   </button>
@@ -491,12 +743,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                             }
                           }}
                           placeholder="Add subtask title..."
-                          className="flex-1 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono focus:outline-none"
+                          className="flex-1 px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono focus:outline-none"
                         />
                         <select
                           value={newModalSubtaskAssigneeId}
                           onChange={e => setNewModalSubtaskAssigneeId(e.target.value)}
-                          className="px-2 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                          className="px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-300 focus:outline-none"
                         >
                           <option value="">Assignee (Optional)</option>
                           {users.map(u => (
@@ -510,7 +762,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                             setTaskSubtasks(prev => [...prev, { title: newModalSubtaskTitle.trim(), assigneeId: newModalSubtaskAssigneeId || undefined }]);
                             setNewModalSubtaskTitle('');
                           }}
-                          className="px-3 py-1.5 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 font-mono text-xs font-bold rounded-lg hover:bg-neutral-300"
+                          className="px-3.5 py-2 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 font-mono text-xs font-bold rounded-xl hover:bg-neutral-300 cursor-pointer"
                         >
                           + Add
                         </button>
@@ -529,7 +781,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={projectName}
                         onChange={e => setProjectName(e.target.value)}
                         placeholder="e.g. AI Workflow Optimization Engine"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                     </div>
 
@@ -539,7 +791,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={projectTemplate}
                           onChange={e => setProjectTemplate(e.target.value as WorkflowTemplate)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="SoftwareSprint">Software Sprint</option>
                           <option value="BugTracking">Bug Tracking</option>
@@ -549,11 +801,11 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Assigned Team</label>
+                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Assigned Team *</label>
                         <select
-                          value={projectTeamId}
+                          value={projectTeamId || (teams[0]?.id || '')}
                           onChange={e => setProjectTeamId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           {teams.map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
@@ -569,7 +821,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={projectDescription}
                         onChange={e => setProjectDescription(e.target.value)}
                         placeholder="Overview of project deliverables..."
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none font-sans"
                       />
                     </div>
                   </>
@@ -585,7 +837,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={goalTitle}
                         onChange={e => setGoalTitle(e.target.value)}
                         placeholder="e.g. Reduce customer churn rate below 2.5%"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                     </div>
 
@@ -595,7 +847,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={goalOwnerType}
                           onChange={e => setGoalOwnerType(e.target.value as any)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="org">Organization Strategic Goal</option>
                           <option value="team">Team OKR</option>
@@ -609,7 +861,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           type="date"
                           value={goalTargetDate}
                           onChange={e => setGoalTargetDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-mono"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -621,7 +873,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={goalDescription}
                         onChange={e => setGoalDescription(e.target.value)}
                         placeholder="Outline target metrics and success criteria..."
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none font-sans"
                       />
                     </div>
                   </>
@@ -637,7 +889,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={newTeamName}
                         onChange={e => setNewTeamName(e.target.value)}
                         placeholder="e.g. Platform DevOps &amp; Security"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                       <span className="text-[10px] text-neutral-400 mt-1 block font-mono">This will be the primary workspace for your initial team members.</span>
                     </div>
@@ -647,7 +899,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       <select
                         value={newTeamLeadId}
                         onChange={e => setNewTeamLeadId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                       >
                         {users.map(u => (
                           <option key={u.id} value={u.id}>{u.name} ({u.role} - {u.title})</option>
@@ -694,7 +946,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={tagName}
                         onChange={e => setTagName(e.target.value)}
                         placeholder="e.g. SOC2-Audit or Microservices"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                     </div>
 
@@ -706,7 +958,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                             key={color}
                             type="button"
                             onClick={() => setTagColorHex(color)}
-                            className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                            className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
                               tagColorHex === color ? 'scale-125 border-black dark:border-white shadow-sm' : 'border-transparent'
                             }`}
                             style={{ backgroundColor: color }}
@@ -722,7 +974,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={tagDescription}
                         onChange={e => setTagDescription(e.target.value)}
                         placeholder="What items does this tag categorize?"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                     </div>
                   </>
@@ -739,7 +991,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           value={memberName}
                           onChange={e => setMemberName(e.target.value)}
                           placeholder="e.g. Samantha Vance"
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                         />
                       </div>
 
@@ -751,7 +1003,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           value={memberEmail}
                           onChange={e => setMemberEmail(e.target.value)}
                           placeholder="samantha@acme.com"
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                         />
                       </div>
                     </div>
@@ -762,7 +1014,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         <select
                           value={memberRole}
                           onChange={e => setMemberRole(e.target.value as Role)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="Member">Member</option>
                           <option value="TeamLead">Team Lead</option>
@@ -776,9 +1028,9 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       <div>
                         <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Assigned Team</label>
                         <select
-                          value={memberTeamId}
+                          value={memberTeamId || (teams[0]?.id || '')}
                           onChange={e => setMemberTeamId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           {teams.map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
@@ -794,10 +1046,17 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         value={memberTitle}
                         onChange={e => setMemberTitle(e.target.value)}
                         placeholder="e.g. Senior DevOps Specialist"
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-sans"
                       />
                     </div>
                   </>
+                )}
+
+                {submitError && (
+                  <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 font-mono text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>{submitError}</span>
+                  </div>
                 )}
 
                 {/* Form Footer */}
@@ -810,17 +1069,28 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors text-xs"
+                      disabled={isSubmitting}
+                      className="px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors text-xs cursor-pointer disabled:opacity-50"
                     >
                       Cancel
                     </button>
 
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold rounded-lg hover:opacity-90 transition-opacity text-xs flex items-center gap-1.5 shadow-sm"
+                      disabled={isSubmitting}
+                      className="px-5 py-2.5 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold rounded-xl hover:opacity-90 transition-opacity text-xs flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      Create {itemType.toUpperCase()}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Saving to Database...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          <span>Create {itemType.toUpperCase()}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

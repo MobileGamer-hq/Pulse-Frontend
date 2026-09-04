@@ -4,16 +4,36 @@ import { UserAvatar } from '../common/UserAvatar';
 import { 
   Building2, Shield, Plug, CreditCard, Tag as TagIcon, 
   Upload, Check, Search, Plus, Edit2, Eye, Slash, 
-  ChevronDown, FileText, MoreVertical,
+  ChevronDown, FileText,
   ShieldCheck, Sliders, Sun, Moon, Monitor, 
-  User, Bell, Smartphone, Laptop, Clock, GripVertical
+  User, Bell, Smartphone, Laptop, Clock, GripVertical, Sparkles
 } from 'lucide-react';
+import { webhooksService } from '../../services/webhooksService';
 
 export const AdminSettingsScreen: React.FC = () => {
   const { 
-    setIsDarkMode, pushPanel, tags, reorderTags, 
+    setIsDarkMode, pushPanel, tags, reorderTags, addTag, updateTag, deleteTag,
     currentUser, currentOrgSlug, activeRole 
   } = useApp();
+
+  const [showCreateTagModal, setShowCreateTagModal] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3B82F6');
+  const [newTagDesc, setNewTagDesc] = useState('');
+
+  // Editing Tag state
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editTagName, setEditTagName] = useState('');
+  const [editTagColor, setEditTagColor] = useState('#3B82F6');
+  const [editTagDesc, setEditTagDesc] = useState('');
+
+  const [showCreateWebhookModal, setShowCreateWebhookModal] = useState(false);
+  const [newWebhookName, setNewWebhookName] = useState('');
+  const [newWebhookUrl, setNewWebhookUrl] = useState('');
+
+  const [showCreateApiKeyModal, setShowCreateApiKeyModal] = useState(false);
+  const [newApiKeyName, setNewApiKeyName] = useState('');
+  const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
 
   const initialEmail = localStorage.getItem('pulse_user_email') || currentUser?.email || 'admin@pulse.app';
   const initialName = localStorage.getItem('pulse_user_name') || currentUser?.name || 'Workspace Admin';
@@ -250,7 +270,11 @@ export const AdminSettingsScreen: React.FC = () => {
                       themeMode === 'light' ? 'border-2 border-black dark:border-white bg-neutral-50 dark:bg-neutral-800 font-bold' : 'border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    {themeMode === 'light' && <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {themeMode === 'light' && (
+                      <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
                     <div className="w-full h-16 bg-white rounded-xl border border-neutral-200 p-2 space-y-1.5">
                       <div className="w-12 h-1.5 bg-neutral-200 rounded-full" />
                       <div className="w-full h-8 bg-neutral-100 rounded-lg flex items-center justify-center">
@@ -269,7 +293,11 @@ export const AdminSettingsScreen: React.FC = () => {
                       themeMode === 'dark' ? 'border-2 border-black dark:border-white bg-neutral-50 dark:bg-neutral-800 font-bold' : 'border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    {themeMode === 'dark' && <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {themeMode === 'dark' && (
+                      <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
                     <div className="w-full h-16 bg-neutral-900 rounded-xl border border-neutral-800 p-2 space-y-1.5">
                       <div className="w-12 h-1.5 bg-neutral-700 rounded-full" />
                       <div className="w-full h-8 bg-neutral-800 rounded-lg flex items-center justify-center">
@@ -288,7 +316,11 @@ export const AdminSettingsScreen: React.FC = () => {
                       themeMode === 'system' ? 'border-2 border-black dark:border-white bg-neutral-50 dark:bg-neutral-800 font-bold' : 'border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    {themeMode === 'system' && <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {themeMode === 'system' && (
+                      <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
                     <div className="w-full h-16 rounded-xl border border-neutral-300 overflow-hidden flex">
                       <div className="w-1/2 bg-white p-1.5 space-y-1">
                         <div className="w-6 h-1 bg-neutral-200 rounded-full" />
@@ -620,7 +652,8 @@ export const AdminSettingsScreen: React.FC = () => {
               {/* Pro Tip Card */}
               <div className="p-6 rounded-2xl bg-neutral-100/60 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-3">
                 <h3 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-sans flex items-center gap-1.5">
-                  💡 Pro Tip
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Pro Tip
                 </h3>
                 <p className="text-xs text-neutral-500 font-sans leading-relaxed">
                   To maintain focus during deep work sessions, utilize the <strong>Quiet Mode Schedule</strong>. We recommend aligning this with your standard out-of-office hours to prevent burnout and ensure notifications only reach you when actionable.
@@ -925,8 +958,8 @@ export const AdminSettingsScreen: React.FC = () => {
                 <div className="space-y-2 font-mono pt-2">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Organization Logo</label>
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center font-bold text-lg">
-                      🏢
+                    <div className="w-12 h-12 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center font-bold text-lg text-neutral-600 dark:text-neutral-300">
+                      <Building2 className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -1169,12 +1202,129 @@ export const AdminSettingsScreen: React.FC = () => {
 
       {/* 6. INTEGRATIONS VIEW */}
       {activeTab === 'integrations' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800 font-mono">
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans">Integrations &amp; API</h1>
+        <div className="space-y-6 font-mono">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-neutral-200 dark:border-neutral-800">
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans">Integrations &amp; API Keys</h1>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Manage webhooks, API tokens, and connected services.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowCreateWebhookModal(true)}
+                className="px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-bold text-xs flex items-center gap-1.5 shadow-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Webhook
+              </button>
+              <button 
+                onClick={() => setShowCreateApiKeyModal(true)}
+                className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs flex items-center gap-1.5 shadow-sm hover:opacity-90"
+              >
+                <Plus className="w-3.5 h-3.5" /> Generate API Key
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
+          {/* Webhook Modal */}
+          {showCreateWebhookModal && (
+            <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 space-y-4">
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Register New Webhook Endpoint</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Webhook Name (e.g. CI/CD Deploy Alert)"
+                  value={newWebhookName}
+                  onChange={e => setNewWebhookName(e.target.value)}
+                  className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                />
+                <input
+                  type="url"
+                  placeholder="Target URL (https://example.com/webhook)"
+                  value={newWebhookUrl}
+                  onChange={e => setNewWebhookUrl(e.target.value)}
+                  className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowCreateWebhookModal(false)}
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!newWebhookName || !newWebhookUrl) return alert('Please enter name and URL');
+                    try {
+                      await webhooksService.createWebhook(currentOrgSlug, {
+                        name: newWebhookName,
+                        targetUrl: newWebhookUrl,
+                        eventTriggers: ['task.created', 'task.blocked'],
+                      });
+                      alert(`Webhook "${newWebhookName}" registered successfully!`);
+                      setShowCreateWebhookModal(false);
+                      setNewWebhookName('');
+                      setNewWebhookUrl('');
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to create webhook');
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm"
+                >
+                  Save Webhook
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* API Key Modal */}
+          {showCreateApiKeyModal && (
+            <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 space-y-4">
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Generate Organization API Key</h3>
+              <input
+                type="text"
+                placeholder="API Key Name (e.g. Production Service Role)"
+                value={newApiKeyName}
+                onChange={e => setNewApiKeyName(e.target.value)}
+                className="w-full p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+              />
+              {generatedApiKey && (
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs break-all">
+                  <div className="font-bold mb-1">Generated Key (copy now, it will not be shown again):</div>
+                  <code>{generatedApiKey}</code>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => { setShowCreateApiKeyModal(false); setGeneratedApiKey(null); }}
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold"
+                >
+                  Close
+                </button>
+                {!generatedApiKey && (
+                  <button
+                    onClick={async () => {
+                      if (!newApiKeyName) return alert('Please enter key name');
+                      try {
+                        const res = await webhooksService.createApiKey(currentOrgSlug, {
+                          name: newApiKeyName,
+                          scopes: ['read', 'write'],
+                        });
+                        setGeneratedApiKey(res.secretKey || 'Key Created');
+                        setNewApiKeyName('');
+                      } catch (err: any) {
+                        alert(err.message || 'Failed to create API Key');
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm"
+                  >
+                    Generate Key
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
               <div className="flex justify-between items-start">
                 <div className="font-bold text-sm">Slack</div>
@@ -1245,72 +1395,249 @@ export const AdminSettingsScreen: React.FC = () => {
       {/* 8. TAGS VIEW */}
       {activeTab === 'tags' && (
         <div className="space-y-6 font-mono">
-          <div className="flex justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800">
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans">Tag Management</h1>
-            <button className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Create New Global Tag</button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-neutral-200 dark:border-neutral-800">
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans">Tag Management</h1>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Define cross-cutting tags for tasks, projects, goals, and team members.</p>
+            </div>
+            <button 
+              onClick={() => setShowCreateTagModal(prev => !prev)}
+              className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-3.5 h-3.5" /> {showCreateTagModal ? 'Close Form' : 'Create New Global Tag'}
+            </button>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
-                <tr>
-                  <th className="pb-2 w-8 text-center" aria-label="Drag handle"></th>
-                  <th className="pb-2">Tag Name</th>
-                  <th className="pb-2">Applies To</th>
-                  <th className="pb-2">Color Swatch</th>
-                  <th className="pb-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {tags.map(t => {
-                  const isDragging = draggedTagId === t.id;
-                  const isDragOver = dragOverTagId === t.id;
+          {/* Inline Create Tag Form */}
+          {showCreateTagModal && (
+            <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/70 border border-neutral-200 dark:border-neutral-700 space-y-4 shadow-sm">
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Create New Organization Tag</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Tag Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Security, Backend, HighPriority"
+                    value={newTagName}
+                    onChange={e => setNewTagName(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Color Theme</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={newTagColor}
+                      onChange={e => setNewTagColor(e.target.value)}
+                      className="w-9 h-9 rounded-lg border cursor-pointer bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={newTagColor}
+                      onChange={e => setNewTagColor(e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Brief scope of this tag..."
+                    value={newTagDesc}
+                    onChange={e => setNewTagDesc(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowCreateTagModal(false)}
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!newTagName.trim()) return alert('Tag name is required');
+                    const color = newTagColor || '#3B82F6';
+                    await addTag({
+                      orgId: currentOrgSlug,
+                      name: newTagName.trim(),
+                      colorHex: color,
+                      bgHex: `${color}1A`,
+                      textHex: color,
+                      description: newTagDesc,
+                      createdBy: currentUser.id,
+                      appliesTo: ['task', 'project', 'person', 'goal'],
+                    });
+                    setNewTagName('');
+                    setNewTagDesc('');
+                    setShowCreateTagModal(false);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm"
+                >
+                  Save &amp; Persist Tag
+                </button>
+              </div>
+            </div>
+          )}
 
-                  return (
-                    <tr 
-                      key={t.id} 
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', t.id);
-                        setDraggedTagId(t.id);
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragOverTagId !== t.id) setDragOverTagId(t.id);
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverTagId === t.id) setDragOverTagId(null);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        handleTagDrop(t.id);
-                      }}
-                      className={`cursor-pointer transition-all ${
-                        isDragging ? 'opacity-30 bg-neutral-100 dark:bg-neutral-800' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      } ${isDragOver ? 'border-t-2 border-t-black dark:border-t-white' : ''}`}
-                      onClick={() => pushPanel({ type: 'tag', id: t.id })}
-                    >
-                      <td className="py-3.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-                        <GripVertical className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-700 cursor-grab active:cursor-grabbing mx-auto" />
-                      </td>
-                      <td className="py-3.5 font-bold font-sans">
-                        <span className="px-2 py-0.5 rounded text-xs border" style={{ backgroundColor: t.bgHex, color: t.textHex, borderColor: 'transparent' }}>
-                          #{t.name}
-                        </span>
-                      </td>
-                      <td className="py-3.5 text-neutral-500 capitalize">{t.appliesTo.join(', ')}</td>
-                      <td className="py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-full border border-neutral-300" style={{ backgroundColor: t.colorHex }} />
-                          <span className="font-mono text-[10px] text-neutral-400">{t.colorHex}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 text-right"><MoreVertical className="w-4 h-4 text-neutral-400 ml-auto" /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Inline Edit Tag Form */}
+          {editingTagId && (
+            <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/70 border border-neutral-200 dark:border-neutral-700 space-y-4 shadow-sm">
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Edit Tag</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Tag Name</label>
+                  <input
+                    type="text"
+                    value={editTagName}
+                    onChange={e => setEditTagName(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Color Theme</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={editTagColor}
+                      onChange={e => setEditTagColor(e.target.value)}
+                      className="w-9 h-9 rounded-lg border cursor-pointer bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={editTagColor}
+                      onChange={e => setEditTagColor(e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-neutral-400 font-bold uppercase block mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    value={editTagDesc}
+                    onChange={e => setEditTagDesc(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setEditingTagId(null)}
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!editTagName.trim()) return alert('Tag name is required');
+                    const color = editTagColor || '#3B82F6';
+                    await updateTag(editingTagId, {
+                      name: editTagName.trim(),
+                      colorHex: color,
+                      bgHex: `${color}1A`,
+                      textHex: color,
+                      description: editTagDesc
+                    });
+                    setEditingTagId(null);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
+            {tags.length === 0 ? (
+              <div className="p-8 text-center text-neutral-400 text-xs">
+                No tags created yet. Click "Create New Global Tag" above to define organization tags.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
+                  <tr>
+                    <th className="pb-2 w-8 text-center" aria-label="Drag handle"></th>
+                    <th className="pb-2">Tag Name</th>
+                    <th className="pb-2">Applies To</th>
+                    <th className="pb-2">Color Swatch</th>
+                    <th className="pb-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {tags.map(t => {
+                    const isDragging = draggedTagId === t.id;
+                    const isDragOver = dragOverTagId === t.id;
+
+                    return (
+                      <tr 
+                        key={t.id} 
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', t.id);
+                          setDraggedTagId(t.id);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          if (dragOverTagId !== t.id) setDragOverTagId(t.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverTagId === t.id) setDragOverTagId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleTagDrop(t.id);
+                        }}
+                        className={`cursor-pointer transition-all ${
+                          isDragging ? 'opacity-30 bg-neutral-100 dark:bg-neutral-800' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        } ${isDragOver ? 'border-t-2 border-t-black dark:border-t-white' : ''}`}
+                        onClick={() => pushPanel({ type: 'tag', id: t.id })}
+                      >
+                        <td className="py-3.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <GripVertical className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-700 cursor-grab active:cursor-grabbing mx-auto" />
+                        </td>
+                        <td className="py-3.5 font-bold font-sans">
+                          <span className="px-2 py-0.5 rounded text-xs border" style={{ backgroundColor: t.bgHex || '#3B82F61A', color: t.textHex || t.colorHex, borderColor: 'transparent' }}>
+                            #{t.name}
+                          </span>
+                        </td>
+                        <td className="py-3.5 text-neutral-500 capitalize">{t.appliesTo?.join(', ') || 'All Entities'}</td>
+                        <td className="py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-full border border-neutral-300" style={{ backgroundColor: t.colorHex }} />
+                            <span className="font-mono text-[10px] text-neutral-400">{t.colorHex}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              setEditingTagId(t.id);
+                              setEditTagName(t.name);
+                              setEditTagColor(t.colorHex);
+                              setEditTagDesc(t.description || '');
+                            }}
+                            className="px-2.5 py-1 rounded text-[10px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteTag(t.id)}
+                            className="px-2.5 py-1 rounded text-[10px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 font-bold cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

@@ -1489,7 +1489,7 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
                   transform={`translate(${node.radius + 6}, -${node.radius + 6})`}
                 >
                   <circle r="11" fill={connectingSourceId === node.id ? '#10B981' : '#3B82F6'} stroke="#FFFFFF" strokeWidth="2" className="drop-shadow-md" />
-                  <text textAnchor="middle" dy="3.5" fill="#FFFFFF" fontSize="10" fontWeight="bold">🔗</text>
+                  <text textAnchor="middle" dy="3.5" fill="#FFFFFF" fontSize="11" fontWeight="bold">+</text>
                 </g>
               </g>
             );

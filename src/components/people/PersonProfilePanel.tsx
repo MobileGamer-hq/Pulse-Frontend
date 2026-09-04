@@ -51,7 +51,7 @@ export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) =>
               <span>{user.title || 'Lead Engineer'}</span>
               <span>•</span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                📍 DEEP WORK
+                DEEP WORK
               </span>
             </div>
           </div>

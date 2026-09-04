@@ -104,7 +104,7 @@ export const WaitingRoomScreen: React.FC = () => {
             {/* Actions */}
             <div className="space-y-3 pt-2">
               <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 space-y-2">
-                <div className="font-bold text-neutral-800 dark:text-neutral-200">🛠️ Demo Testing Toolbar</div>
+                <div className="font-bold text-neutral-800 dark:text-neutral-200">Demo Testing Toolbar</div>
                 <div className="text-[10px]">Simulate Admin/Manager acceptance &amp; role assignment:</div>
                 <div className="flex flex-wrap gap-2 justify-center pt-1">
                   {['Member', 'TeamLead', 'Manager', 'Executive', 'Admin'].map(role => (

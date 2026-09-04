@@ -1,4 +1,13 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+const getBaseApiUrl = (): string => {
+  let url = (import.meta.env.VITE_API_URL || 'https://pulse-backend-huzb.onrender.com/api/v1').trim();
+  url = url.replace(/\/+$/, '');
+  if (!url.endsWith('/api/v1')) {
+    url = `${url}/api/v1`;
+  }
+  return url;
+};
+
+const API_URL = getBaseApiUrl();
 
 export interface RequestOptions extends RequestInit {
   orgSlug?: string;

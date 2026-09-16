@@ -3,9 +3,10 @@ import { useApp } from '../../context/AppContext';
 import { 
   ZoomIn, ZoomOut, Link2, Check, 
   User as UserIcon, Grid, MousePointer, 
-  SlidersHorizontal, LayoutGrid, Network
+  SlidersHorizontal, LayoutGrid, Network, Activity
 } from 'lucide-react';
 import type { EntityType, Team, Project, Task, Goal, User as UserType } from '../../types';
+import { getProjectContributors } from '../../utils/projectContributors';
 
 export interface GraphNode {
   id: string;
@@ -57,6 +58,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
   const [activeTool, setActiveTool] = useState<'select' | 'connector'>('select');
   const [showWebGrid, setShowWebGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
+  const [enablePulseAnimation, setEnablePulseAnimation] = useState(true);
 
   // Toggle Option: 'avatar' | 'card' Profile View for People
   const [displayMode, setDisplayMode] = useState<'avatar' | 'card'>('card');
@@ -201,7 +203,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
 
     // Ring 3: People / Members (Contextual Multi-Occurrence Instances!)
     users.forEach((u: UserType, uIndex: number) => {
-      const userProjects = projects.filter(p => p.memberIds.includes(u.id));
+      const userProjects = projects.filter(p => getProjectContributors(p, teams, users, tasks).some(c => c.id === u.id));
       const userEod = eodEntries.find(e => e.userId === u.id);
       let eodStatus: 'good' | 'low' | 'blocked' | 'neutral' = 'neutral';
       if (userEod) {
@@ -729,6 +731,19 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
           <SlidersHorizontal className="w-4 h-4" />
         </button>
 
+        {/* Pulse Flow Animation Toggle */}
+        <button
+          onClick={() => setEnablePulseAnimation(prev => !prev)}
+          className={`p-2 rounded-xl transition-all ${
+            enablePulseAnimation 
+              ? 'text-cyan-500 bg-cyan-500/10 border border-cyan-500/30 dark:bg-cyan-500/20 shadow-xs' 
+              : 'text-neutral-400 hover:text-black dark:hover:text-white'
+          }`}
+          title={enablePulseAnimation ? "Pulse Flow Active (Click to Pause)" : "Enable Pulse Animation"}
+        >
+          <Activity className={`w-4 h-4 ${enablePulseAnimation ? 'animate-pulse' : ''}`} />
+        </button>
+
         <div className="w-px h-5 bg-neutral-200 dark:bg-neutral-800 my-auto" />
 
         {/* Zoom Controls */}
@@ -765,6 +780,25 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
 
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           <defs>
+            {/* Glow filters for energetic pulse effect */}
+            <filter id="pulse-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            <filter id="pulse-glow-strong" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur1" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur2" />
+              <feMerge>
+                <feMergeNode in="blur1" />
+                <feMergeNode in="blur2" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
             <marker id="spider-arrow" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill={isDarkMode ? '#475569' : '#94A3B8'} />
             </marker>
@@ -809,7 +843,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
             </g>
           )}
 
-          {/* 2. Link Edges */}
+          {/* 2. Link Edges with Pulse Animation */}
           {edges.map(edge => {
             const sourceNode = nodes.find(n => n.id === edge.source);
             const targetNode = nodes.find(n => n.id === edge.target);
@@ -832,6 +866,47 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
 
             const pathD = `M ${sourceNode.x} ${sourceNode.y} Q ${cx} ${cy} ${targetNode.x} ${targetNode.y}`;
 
+            // Contextual Pulse Color & Speed
+            const isBlocked = (sourceNode.type === 'task' && sourceNode.status === 'Blocked') ||
+              (targetNode.type === 'task' && targetNode.status === 'Blocked') ||
+              sourceNode.eodStatus === 'blocked' ||
+              targetNode.eodStatus === 'blocked';
+
+            const isInProgress = (sourceNode.type === 'task' && sourceNode.status === 'InProgress') ||
+              (targetNode.type === 'task' && targetNode.status === 'InProgress') ||
+              edge.animated === true;
+
+            const isDone = (sourceNode.type === 'task' && sourceNode.status === 'Done') ||
+              (targetNode.type === 'task' && targetNode.status === 'Done');
+
+            let pulseColor = isDarkMode ? '#60A5FA' : '#2563EB';
+            let pulseDuration = 3.2;
+
+            if (isBlocked) {
+              pulseColor = '#EF4444'; // Red alert pulse
+              pulseDuration = 1.8;
+            } else if (isInProgress) {
+              pulseColor = '#06B6D4'; // Vibrant Cyan for active sprint tasks
+              pulseDuration = 2.2;
+            } else if (isDone) {
+              pulseColor = '#10B981'; // Emerald for completed tasks
+              pulseDuration = 3.5;
+            } else if (sourceNode.type === 'goal' || targetNode.type === 'goal') {
+              pulseColor = '#EC4899'; // Pink for OKRs
+              pulseDuration = 3.6;
+            } else if (sourceNode.type === 'person' || targetNode.type === 'person') {
+              pulseColor = '#3B82F6'; // Blue for contributors
+              pulseDuration = 2.9;
+            } else if (sourceNode.level === 0 || targetNode.level === 0) {
+              pulseColor = '#818CF8'; // Indigo for Core Hub
+              pulseDuration = 2.7;
+            }
+
+            // Pseudo-random phase offset for organic pulsing rhythms
+            const coordHash = Math.abs(Math.sin(sourceNode.x * 12.9898 + targetNode.y * 78.233)) * 10;
+            const staggerOffset = (coordHash % pulseDuration);
+            const isFastPulse = isInProgress || isBlocked || isHighlighted;
+
             return (
               <g 
                 key={edge.id} 
@@ -847,7 +922,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                 {/* Thick Invisible Hit Area */}
                 <path d={pathD} stroke="transparent" strokeWidth="16" fill="none" />
 
-                {/* Visible Path */}
+                {/* Base Track Path */}
                 <path
                   d={pathD}
                   stroke={isEdgeHovered || isEdgeSelected ? '#EF4444' : (isHighlighted ? strokeLinkActiveColor : strokeLinkColor)}
@@ -856,6 +931,68 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                   fill="none"
                   markerEnd={isEdgeHovered || isEdgeSelected ? undefined : (isHighlighted ? 'url(#spider-arrow-active)' : 'url(#spider-arrow)')}
                 />
+
+                {/* Primary Animated Traveling Pulse Energy Orb (with aura moving WITH the orb) */}
+                {enablePulseAnimation && !isEdgeHovered && !isEdgeSelected && (
+                  <g opacity={isHighlighted ? 1 : 0.7}>
+                    {/* Soft outer glowing aura traveling with the orb */}
+                    <circle r={isHighlighted ? 9 : 7} fill={pulseColor} opacity="0.3" filter="url(#pulse-glow-strong)">
+                      <animateMotion
+                        path={pathD}
+                        dur={`${pulseDuration}s`}
+                        begin={`-${staggerOffset}s`}
+                        repeatCount="indefinite"
+                        rotate="auto"
+                      />
+                    </circle>
+                    {/* Concentrated mid-aura ring */}
+                    <circle r={isHighlighted ? 5.5 : 4} fill={pulseColor} opacity="0.6" filter="url(#pulse-glow)">
+                      <animateMotion
+                        path={pathD}
+                        dur={`${pulseDuration}s`}
+                        begin={`-${staggerOffset}s`}
+                        repeatCount="indefinite"
+                        rotate="auto"
+                      />
+                    </circle>
+                    {/* Core luminous orb */}
+                    <circle r={isHighlighted ? 3.2 : 2.2} fill="#FFFFFF" stroke={pulseColor} strokeWidth="1.2">
+                      <animateMotion
+                        path={pathD}
+                        dur={`${pulseDuration}s`}
+                        begin={`-${staggerOffset}s`}
+                        repeatCount="indefinite"
+                        rotate="auto"
+                      />
+                    </circle>
+                  </g>
+                )}
+
+                {/* Secondary trailing pulse orb for highlighted or active in-progress connections */}
+                {enablePulseAnimation && isFastPulse && !isEdgeHovered && !isEdgeSelected && (
+                  <g opacity={isHighlighted ? 0.85 : 0.5}>
+                    {/* Trailing aura */}
+                    <circle r={isHighlighted ? 6 : 4.5} fill={pulseColor} opacity="0.3" filter="url(#pulse-glow)">
+                      <animateMotion
+                        path={pathD}
+                        dur={`${pulseDuration}s`}
+                        begin={`-${(staggerOffset + pulseDuration * 0.5) % pulseDuration}s`}
+                        repeatCount="indefinite"
+                        rotate="auto"
+                      />
+                    </circle>
+                    {/* Trailing luminous orb */}
+                    <circle r={isHighlighted ? 2.2 : 1.6} fill="#FFFFFF" stroke={pulseColor} strokeWidth="0.8">
+                      <animateMotion
+                        path={pathD}
+                        dur={`${pulseDuration}s`}
+                        begin={`-${(staggerOffset + pulseDuration * 0.5) % pulseDuration}s`}
+                        repeatCount="indefinite"
+                        rotate="auto"
+                      />
+                    </circle>
+                  </g>
+                )}
 
                 {/* Disconnect Button at Midpoint */}
                 {(isEdgeHovered || isEdgeSelected) && (

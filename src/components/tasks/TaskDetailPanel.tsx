@@ -145,14 +145,14 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
               }
             }}
             title="Delete Task" 
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
           </button>
           <button 
             onClick={() => setIsEditingMain(true)}
             title="Edit Task Title & Description"
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               isEditingMain 
                 ? 'bg-black text-white dark:bg-white dark:text-black' 
                 : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
@@ -160,11 +160,8 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
           >
             <Pencil className="w-4 h-4" />
           </button>
-          <button className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+          <button className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer">
             <LinkIcon className="w-4 h-4" />
-          </button>
-          <button onClick={popPanel} className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -499,7 +496,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
             <div>
               <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Assigned Project</label>
               <select
-                value={task.projectId}
+                value={task.projectId || projects.find(p => p.name.toLowerCase() === (task.projectName || '').toLowerCase())?.id || ''}
                 onChange={async e => {
                   const targetProj = projects.find(p => p.id === e.target.value);
                   try {
@@ -508,6 +505,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
                 }}
                 className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
               >
+                <option value="" disabled>Select Project...</option>
                 {projects.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}

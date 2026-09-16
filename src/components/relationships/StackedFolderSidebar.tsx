@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TaskStatus, Team, Project, Task, Goal, Tag } from '../../types';
+import { getProjectContributors } from '../../utils/projectContributors';
 
 interface StackedFolderSidebarProps {
   selectedNodeId: string | null;
@@ -259,7 +260,7 @@ export const StackedFolderSidebar: React.FC<StackedFolderSidebarProps> = ({
                             const isProjSelected = selectedNodeId === `proj-${project.id}`;
                             const projectTasks = tasks.filter((t: Task) => t.projectId === project.id);
                             const projectGoals = goals.filter((g: Goal) => project.linkedGoalIds.includes(g.id));
-                            const projectPeople = users.filter(u => project.memberIds.includes(u.id));
+                            const projectPeople = getProjectContributors(project, teams, users, tasks);
                             const isMultiTeam = project.teamIds && project.teamIds.length > 1;
 
                             return (
@@ -557,7 +558,7 @@ export const StackedFolderSidebar: React.FC<StackedFolderSidebarProps> = ({
                   </p>
                   <div className="mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-700/60 flex items-center justify-between text-[10px] font-mono">
                     <span>{projTasks.length} tasks</span>
-                    <span>{proj.memberIds.length} assigned</span>
+                    <span>{getProjectContributors(proj, teams, users, tasks).length} assigned</span>
                   </div>
                 </div>
               );

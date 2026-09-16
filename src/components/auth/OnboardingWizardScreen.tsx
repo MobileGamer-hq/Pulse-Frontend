@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Check, Code, Compass, TrendingUp, LayoutGrid, User, Mail, Lock, Building2, Users, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { PulseLogo } from '../common/PulseLogo';
+import { organizationService } from '../../services/organizationService';
+import { teamService } from '../../services/teamService';
+import { supabase } from '../../services/supabaseClient';
 import type { WorkflowTemplate } from '../../types';
 
 interface OnboardingWizardScreenProps {
@@ -14,7 +18,6 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
   const [loading, setLoading] = useState(false);
 
   // Check if user is already logged in
-  const existingUserId = localStorage.getItem('pulse_user_id');
   const existingEmail = localStorage.getItem('pulse_user_email');
   const existingName = localStorage.getItem('pulse_user_name');
 
@@ -34,12 +37,13 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
   const [teamName, setTeamName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
 
-  // Auto-skip Step 1 if user is already authenticated
+  // Auto-skip Step 1 if user is already authenticated with Supabase
   React.useEffect(() => {
-    const token = localStorage.getItem('pulse_auth_token');
-    if (token && existingUserId && step === 1) {
-      setStep(2);
-    }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setStep(2);
+      }
+    });
   }, []);
 
   // Handle Step 1: Create Account
@@ -47,7 +51,8 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
     e.preventDefault();
     setError(null);
 
-    if (localStorage.getItem('pulse_auth_token') && localStorage.getItem('pulse_user_id')) {
+    const { data: authCheck } = await supabase.auth.getUser();
+    if (authCheck?.user) {
       setStep(2);
       return;
     }
@@ -60,13 +65,49 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
       setError('Please enter a valid email address.');
       return;
     }
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
 
     setLoading(true);
     try {
-      localStorage.setItem('pulse_auth_token', 'demo-auth-token');
-      localStorage.setItem('pulse_user_id', 'usr-active');
-      localStorage.setItem('pulse_user_email', email);
-      localStorage.setItem('pulse_user_name', fullName);
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanFullName = fullName.trim();
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: cleanFullName,
+          },
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message || 'Failed to create account.');
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user) {
+        await supabase.from('users').upsert({
+          id: data.user.id,
+          email: cleanEmail,
+          full_name: cleanFullName,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+        localStorage.setItem('pulse_auth_token', data.session?.access_token || data.user.id);
+        localStorage.setItem('pulse_user_id', data.user.id);
+        localStorage.setItem('pulse_user_email', cleanEmail);
+        localStorage.setItem('pulse_user_name', cleanFullName);
+      }
 
       setStep(2);
     } catch (err: any) {
@@ -84,15 +125,22 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
       setError('Please enter an organization name.');
       return;
     }
-    const slug = orgSlug.trim() ? orgSlug.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slug = orgSlug.trim() ? orgSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') : orgName.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (!slug) {
-      setError('Please enter a valid workspace slug/subdomain.');
+      setError('Please enter a valid workspace slug.');
       return;
     }
-    setOrgSlug(slug);
 
     setLoading(true);
     try {
+      const check = await organizationService.checkSlugAvailable(slug);
+      if (!check.available) {
+        setError(check.reason || `The workspace slug "${slug}" is already taken. Please choose another.`);
+        setLoading(false);
+        return;
+      }
+
+      setOrgSlug(slug);
       localStorage.setItem('pulse_tenant_slug', slug);
       setStep(3);
     } catch (err: any) {
@@ -101,6 +149,7 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
       setLoading(false);
     }
   };
+
 
   // Handle Step 3 Validation & Team Creation
   const handleStep3Next = async (e: React.FormEvent) => {
@@ -121,6 +170,27 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
 
     try {
       localStorage.setItem('pulse_tenant_slug', finalSlug);
+      localStorage.setItem(`pulse_org_status_${finalSlug}`, 'APPROVED');
+      localStorage.setItem(`pulse_user_role_${finalSlug}`, 'Admin');
+      localStorage.setItem('pulse_is_new_user', 'false');
+
+      // 1. Create Organization in Supabase and Local Store
+      await organizationService.createOrganization({
+        name: orgName.trim(),
+        slug: finalSlug,
+      });
+
+      // 2. Create Primary Team in Supabase and Local Store
+      if (teamName.trim()) {
+        try {
+          await teamService.createTeam(finalSlug, {
+            name: teamName.trim(),
+            workflowTemplate: selectedTemplate || 'SoftwareSprint',
+          });
+        } catch (teamErr) {
+          console.warn('[OnboardingWizard] Team creation error:', teamErr);
+        }
+      }
 
       if (onComplete) {
         onComplete();
@@ -173,9 +243,7 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs shadow-sm">
-            ◇
-          </div>
+          <PulseLogo size="sm" />
           <div>
             <span className="font-bold text-lg tracking-tight block leading-tight">Pulse</span>
             <span className="text-[10px] text-neutral-400 font-mono block">by Epicordia</span>
@@ -373,19 +441,24 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
 
             <div>
               <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
-                Workspace Subdomain (Slug)
+                Workspace URL Route (Slug)
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 overflow-hidden focus-within:border-neutral-900 dark:focus-within:border-white transition-colors">
+                <span className="pl-3 pr-0.5 font-mono text-neutral-400 text-xs select-none">
+                  pulse.epicordia.com/
+                </span>
                 <input
                   type="text"
                   required
                   value={orgSlug}
-                  onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                  onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="epicordia"
-                  className="flex-1 px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+                  className="flex-1 py-2.5 pr-3 pl-0.5 bg-transparent text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
                 />
-                <span className="font-mono text-neutral-400 text-xs">.pulse.app</span>
               </div>
+              <span className="text-[10px] text-neutral-400 font-mono mt-1 block">
+                Your workspace URL: pulse.epicordia.com/{orgSlug || 'workspace-slug'}
+              </span>
             </div>
 
             <div>
@@ -544,7 +617,7 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-left text-xs font-mono space-y-2 border border-neutral-200 dark:border-neutral-700">
             <div>• Admin User: <span className="font-bold text-neutral-900 dark:text-neutral-100">{fullName} ({email})</span></div>
-            <div>• Organization: <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgName} ({orgSlug}.pulse.app)</span></div>
+            <div>• Organization: <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgName} (pulse.epicordia.com/{orgSlug})</span></div>
             <div>• Size &amp; Industry: <span className="font-bold text-neutral-900 dark:text-neutral-100">{companySize} • {industry}</span></div>
             <div>• Initial Team: <span className="font-bold text-neutral-900 dark:text-neutral-100">{teamName}</span></div>
             <div>• Workflow Template: <span className="font-bold text-neutral-900 dark:text-neutral-100">{selectedTemplate}</span></div>

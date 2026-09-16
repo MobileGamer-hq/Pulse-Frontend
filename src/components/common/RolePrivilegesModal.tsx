@@ -9,7 +9,7 @@ interface RolePrivilegeInfo {
   title: string;
   badgeColor: string;
   description: string;
-  userExample: string;
+  scopeDescription: string;
   permissions: {
     createProjects: boolean;
     createTasks: boolean;
@@ -28,7 +28,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'System Administrator & CTO',
     badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-300',
     description: 'Full organizational authority over workspace configurations, integrations, team provisioning, and RBAC roles.',
-    userExample: 'David Kim (Chief Technology Officer)',
+    scopeDescription: 'Organization-wide root access & technical infrastructure management',
     permissions: {
       createProjects: true,
       createTasks: true,
@@ -50,7 +50,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'Executive Leadership (C-Suite / VP)',
     badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300',
     description: 'Strategic oversight role focused on high-level enterprise OKRs, portfolio reporting, and risk mitigation.',
-    userExample: 'Sarah Jenkins (VP of Product)',
+    scopeDescription: 'Strategic executive oversight, enterprise OKRs, and portfolio health metrics',
     permissions: {
       createProjects: true,
       createTasks: false,
@@ -72,7 +72,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'Project & Engineering Manager',
     badgeColor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300',
     description: 'Operational manager leading project delivery, resource allocation, task dispatching, and daily blocker resolution.',
-    userExample: 'Amaka Okafor (Engineering Manager)',
+    scopeDescription: 'Project delivery, team resource allocation, and sprint timeline leadership',
     permissions: {
       createProjects: true,
       createTasks: true,
@@ -94,7 +94,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'People & Culture Operations',
     badgeColor: 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300 border-pink-300',
     description: 'Focuses on team structure, employee onboarding, capacity planning, and organizational health.',
-    userExample: 'Grace Vance (People & Culture Director)',
+    scopeDescription: 'People operations, team directory structure, and workspace onboarding',
     permissions: {
       createProjects: false,
       createTasks: false,
@@ -116,7 +116,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'Team Lead & Sprint Captain',
     badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-300',
     description: 'Hands-on sprint leader guiding day-to-day execution, task assignments, and technical reviews.',
-    userExample: 'Elena Rostova (Lead Product Designer)',
+    scopeDescription: 'Sprint execution, task breakdown, code review, and technical triage',
     permissions: {
       createProjects: false,
       createTasks: true,
@@ -138,7 +138,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'Standard Team Member / Engineer / Designer',
     badgeColor: 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-neutral-300',
     description: 'Core contributor focusing on task execution, subtask updates, and daily status logging.',
-    userExample: 'Alex Chen (Senior Backend Engineer)',
+    scopeDescription: 'Individual task execution, status updates, and daily pulse check-ins',
     permissions: {
       createProjects: false,
       createTasks: true,
@@ -160,7 +160,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'External Contractor / Specialist',
     badgeColor: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-300',
     description: 'External partner with scoped access restricted strictly to assigned tasks and daily check-ins.',
-    userExample: 'Jordan Smith (Growth Specialist Contractor)',
+    scopeDescription: 'External contributor access restricted strictly to assigned tasks and EOD logs',
     permissions: {
       createProjects: false,
       createTasks: false,
@@ -366,7 +366,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                       <div className={`p-2 rounded-lg text-[11px] font-mono ${
                         isActive ? 'bg-neutral-800 dark:bg-neutral-100 text-neutral-200 dark:text-neutral-800' : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-800'
                       }`}>
-                        <strong>Mock User:</strong> {r.userExample}
+                        <strong>Access Scope:</strong> {r.scopeDescription}
                       </div>
 
                       <div className="space-y-1">

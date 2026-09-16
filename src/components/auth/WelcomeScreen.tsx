@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, Shield, Activity, Layers, 
-  LogIn, ChevronRight
+  LogIn
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { PulseLogo } from '../common/PulseLogo';
 
 interface WelcomeScreenProps {
   onStartSetup?: () => void;
@@ -18,10 +18,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onInvite
 }) => {
   const navigate = useNavigate();
-  const { setActiveScreen } = useApp();
-  const [quickName, setQuickName] = useState('');
-  const [quickEmail, setQuickEmail] = useState('');
-  const [agreeTerms, setAgreeTerms] = useState(true);
 
   const handleStartSetup = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -57,10 +53,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-sans selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
       {/* Top Navbar */}
       <header className="w-full max-w-7xl mx-auto px-6 lg:px-12 py-6 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveScreen('welcome')}>
-          <div className="w-8 h-8 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-sm shadow-xs">
-            ◇
-          </div>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/welcome')}>
+          <PulseLogo size="md" />
           <div>
             <span className="font-bold text-lg tracking-tight block leading-none font-mono">PULSE</span>
             <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono tracking-wider block mt-0.5">by Epicordia</span>
@@ -246,61 +240,47 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
           </div>
 
-          {/* Quick Setup Launcher Widget */}
+          {/* Quick Setup Launcher CTA Card */}
           <div className="lg:col-span-5 flex justify-center lg:justify-end">
-            <div className="w-full max-w-md bg-white dark:bg-neutral-950 p-6 sm:p-8 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
-              <div className="space-y-1">
-                <div className="font-bold text-base text-neutral-900 dark:text-white">Create Your Account</div>
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">Register your user account to access or launch workspaces.</div>
+            <div className="w-full max-w-md bg-white dark:bg-neutral-950 p-6 sm:p-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
+                  <span>⚡ Instant Deployment</span>
+                </div>
+                <h3 className="font-bold text-lg text-neutral-900 dark:text-white tracking-tight">
+                  Get Started with Pulse
+                </h3>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed font-sans">
+                  Create your organization workspace or sign in to your team to start logging daily pulse standups and tracking OKRs.
+                </p>
               </div>
 
-              <form onSubmit={handleStartSetup} className="space-y-4 font-mono text-xs">
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase text-neutral-700 dark:text-neutral-300 mb-1">
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={quickName}
-                    onChange={e => setQuickName(e.target.value)}
-                    placeholder="e.g. Alex Chen"
-                    className="w-full px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-white font-sans text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase text-neutral-700 dark:text-neutral-300 mb-1">
-                    Work Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={quickEmail}
-                    onChange={e => setQuickEmail(e.target.value)}
-                    placeholder="alex@company.com"
-                    className="w-full px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-white font-sans text-xs"
-                  />
-                </div>
-
-                <div className="flex items-start gap-2 text-[11px] text-neutral-600 dark:text-neutral-400 font-sans">
-                  <input
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={e => setAgreeTerms(e.target.checked)}
-                    className="mt-0.5 rounded border-neutral-300 dark:border-neutral-700"
-                  />
-                  <span>I agree to workspace terms and privacy guidelines.</span>
-                </div>
+              <div className="space-y-3 font-mono text-xs">
+                <button
+                  onClick={() => handleStartSetup()}
+                  className="w-full py-3 px-4 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <span>Set Up New Workspace</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
 
                 <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+                  onClick={handleSignIn}
+                  className="w-full py-3 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:border-black dark:hover:border-white text-neutral-800 dark:text-neutral-200 font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>Register Account</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign In to Existing Account</span>
                 </button>
-              </form>
+              </div>
+
+              <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 text-center">
+                <button
+                  onClick={handleInvite}
+                  className="text-[11px] font-mono text-neutral-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Have an invitation link? Join workspace →
+                </button>
+              </div>
             </div>
           </div>
         </div>

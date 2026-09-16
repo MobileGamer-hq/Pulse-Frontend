@@ -6,6 +6,7 @@ import {
   X, Plus, Network, 
   ArrowRight, Loader2, Clock, Calendar, Check
 } from 'lucide-react';
+import { getProjectContributors } from '../../utils/projectContributors';
 
 interface ProjectDetailPanelProps {
   id: string;
@@ -21,17 +22,23 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
   const handleOpenRelationshipMap = () => {
     popPanel();
     setActiveScreen('relationships');
-    navigate(`/organizations/${currentOrgSlug}/relationships`);
+    navigate(`/${currentOrgSlug || 'epicordia'}/relationships`);
   };
 
-  const project = projects.find(p => p.id === id) || projects[0];
-  const projectTasks = tasks.filter(t => t.projectId === project?.id);
+  const project = projects.find(p => p.id === id || p.name.toLowerCase() === id.toLowerCase()) || projects[0];
+  const projectTasks = tasks.filter(t => 
+    (project && t.projectId === project.id) ||
+    (t.projectId === id) ||
+    (project && t.projectName && project.name && t.projectName.toLowerCase() === project.name.toLowerCase())
+  );
   const completedTasksCount = projectTasks.filter(t => t.status === 'Done').length;
-  const progressPercent = projectTasks.length > 0 ? Math.round((completedTasksCount / projectTasks.length) * 100) : 0;
+  const progressPercent = projectTasks.length > 0 
+    ? Math.round((completedTasksCount / projectTasks.length) * 100) 
+    : (project?.status === 'Completed' ? 100 : 0);
 
+  const projectContributors = getProjectContributors(project, teams, users, tasks);
   const assignedTeam = teams.find(t => t.id === project?.teamId);
-  const teamMembers = users.filter(u => assignedTeam?.memberIds?.includes(u.id) || u.teamId === assignedTeam?.id);
-  const displayMembers = teamMembers.length > 0 ? teamMembers : [currentUser];
+  const displayMembers = projectContributors.length > 0 ? projectContributors : [currentUser];
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -129,16 +136,13 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
             <button 
               onClick={() => setIsEditingProj(prev => !prev)}
               title="Edit Project Details"
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isEditingProj 
                   ? 'bg-black text-white dark:bg-white dark:text-black' 
                   : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
             >
               <span className="text-xs font-mono font-bold">{isEditingProj ? 'Editing...' : 'Edit'}</span>
-            </button>
-            <button onClick={popPanel} className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer">
-              <X className="w-4 h-4" />
             </button>
           </div>
         </div>

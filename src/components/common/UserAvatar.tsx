@@ -50,14 +50,17 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   onColorChange,
   onClick
 }) => {
+  const safeName = typeof name === 'string' ? name : (name as any)?.name ? String((name as any).name) : 'User';
+  const safeAvatarUrl = avatarUrl || (typeof name === 'object' && (name as any)?.avatarUrl ? (name as any).avatarUrl : undefined);
+
   const [imgError, setImgError] = useState(false);
   const [currentColor, setCurrentColor] = useState(
-    customColor || getDeterministicColor(name || 'User')
+    customColor || getDeterministicColor(safeName || 'User')
   );
   const [showColorPicker, setShowColorPicker] = useState(false);
 
-  const initials = name
-    ? name.trim().split(/\s+/).map(part => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
+  const initials = safeName
+    ? safeName.trim().split(/\s+/).map(part => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
     : 'U';
 
   const sizeClasses = {
@@ -75,15 +78,15 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     setShowColorPicker(false);
   };
 
-  const isExternalPhoto = Boolean(avatarUrl && avatarUrl.includes('images.unsplash.com'));
-  const hasValidImage = Boolean(avatarUrl && avatarUrl.trim() !== '' && !imgError && !isExternalPhoto);
+  const isExternalPhoto = Boolean(safeAvatarUrl && typeof safeAvatarUrl === 'string' && safeAvatarUrl.includes('images.unsplash.com'));
+  const hasValidImage = Boolean(safeAvatarUrl && typeof safeAvatarUrl === 'string' && safeAvatarUrl.trim() !== '' && !imgError && !isExternalPhoto);
 
   return (
     <div className="relative inline-block shrink-0">
       {hasValidImage ? (
         <img
-          src={avatarUrl!}
-          alt={name}
+          src={safeAvatarUrl!}
+          alt={safeName}
           onError={() => setImgError(true)}
           onClick={onClick}
           className={`${sizeClasses} rounded-full object-cover border border-neutral-200 dark:border-neutral-700 ${className}`}

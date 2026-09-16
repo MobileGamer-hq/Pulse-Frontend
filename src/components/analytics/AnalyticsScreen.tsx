@@ -8,16 +8,17 @@ import {
 } from 'recharts';
 import { 
   Download, RefreshCw, CheckCircle2, 
-  TrendingUp, Clock, AlertTriangle, MoreHorizontal, Loader2, ChevronDown 
+  TrendingUp, Clock, AlertTriangle, MoreHorizontal, Loader2, ChevronDown, RotateCw
 } from 'lucide-react';
 
-// Data Mock Sets
+// Chart Palette Constants
 const DONUT_COLORS = ['#14161F', '#E2E4E9'];
 
 export const AnalyticsScreen: React.FC = () => {
-  const { analyticsData, isAnalyticsLoading, refreshAnalytics, tasks } = useApp();
+  const { analyticsData, isAnalyticsLoading, refreshAnalytics, tasks, refreshWorkspaceData } = useApp();
   const [activeTab, setActiveTab] = useState<'insights' | 'habits' | 'team' | 'bottlenecks'>('insights');
   const [timeRange, setTimeRange] = useState<string>('30d');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleTimeRangeChange = (range: string) => {
     setTimeRange(range);
@@ -25,7 +26,15 @@ export const AnalyticsScreen: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    await refreshAnalytics(timeRange);
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refreshAnalytics(timeRange),
+        refreshWorkspaceData(false)
+      ]);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
   };
 
   const handleExport = () => {
@@ -202,6 +211,16 @@ export const AnalyticsScreen: React.FC = () => {
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Sync analytics with database"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
 
           <ExportDropdown
             filename="pulse_analytics_export"

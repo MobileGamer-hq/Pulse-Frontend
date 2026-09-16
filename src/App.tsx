@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate, Outlet } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/common/Sidebar';
 import { Header } from './components/common/Header';
@@ -27,15 +27,17 @@ import { InviteAcceptanceScreen } from './components/auth/InviteAcceptanceScreen
 import { OrgSwitcherScreen } from './components/auth/OrgSwitcherScreen';
 import { WaitingRoomScreen } from './components/auth/WaitingRoomScreen';
 import { TenantGuard } from './components/auth/TenantGuard';
+import { AnimatePresence } from 'framer-motion';
+import { WorkspaceGlassLoader } from './components/common/WorkspaceGlassLoader';
 import { SlideOverDrawer } from './components/common/SlideOverDrawer';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { SupportModal } from './components/common/SupportModal';
 import { InAppNotificationToast } from './components/common/InAppNotificationToast';
+import { supabase } from './services/supabaseClient';
 
 const OrgRouteSync: React.FC = () => {
   const { orgSlug, screen, taskId, projectId } = useParams<{ orgSlug?: string; screen?: string; taskId?: string; projectId?: string }>();
-  const { activeScreen, setActiveScreen, currentOrgSlug, setCurrentOrgSlug, pushPanel, panelStack } = useApp();
-  const navigate = useNavigate();
+  const { setActiveScreen, currentOrgSlug, setCurrentOrgSlug, pushPanel, panelStack } = useApp();
   const location = useLocation();
 
   // Sync route params into AppContext
@@ -46,19 +48,20 @@ const OrgRouteSync: React.FC = () => {
     
     // Determine current screen from route segment or pathname
     let targetScreen = screen || 'dashboard';
-    if (location.pathname.includes('/tasks')) targetScreen = 'tasks';
-    else if (location.pathname.includes('/projects')) targetScreen = 'projects';
-    else if (location.pathname.includes('/pulse')) targetScreen = 'pulse';
-    else if (location.pathname.includes('/relationships')) targetScreen = 'relationships';
-    else if (location.pathname.includes('/goals')) targetScreen = 'goals';
-    else if (location.pathname.includes('/analytics')) targetScreen = 'analytics';
-    else if (location.pathname.includes('/reports')) targetScreen = 'reports';
-    else if (location.pathname.includes('/team')) targetScreen = 'team';
-    else if (location.pathname.includes('/admin')) targetScreen = 'admin';
+    const path = location.pathname.toLowerCase();
+    if (path.includes('/tasks')) targetScreen = 'tasks';
+    else if (path.includes('/projects')) targetScreen = 'projects';
+    else if (path.includes('/pulse')) targetScreen = 'pulse';
+    else if (path.includes('/relationships') || path.includes('/spiderweb-relationships') || path.includes('/lab-relationships')) targetScreen = 'relationships';
+    else if (path.includes('/goals')) targetScreen = 'goals';
+    else if (path.includes('/analytics')) targetScreen = 'analytics';
+    else if (path.includes('/reports')) targetScreen = 'reports';
+    else if (path.includes('/team')) targetScreen = 'team';
+    else if (path.includes('/admin')) targetScreen = 'admin';
+    else if (path.includes('/archive')) targetScreen = 'archive';
+    else if (path.includes('/notifications')) targetScreen = 'notifications';
 
-    if (targetScreen !== activeScreen) {
-      setActiveScreen(targetScreen);
-    }
+    setActiveScreen(targetScreen);
 
     // Handle nested entity drawers (e.g. /tasks/:taskId or /projects/:projectId)
     if (taskId && !panelStack.some(p => p.type === 'task' && p.id === taskId)) {
@@ -66,24 +69,13 @@ const OrgRouteSync: React.FC = () => {
     } else if (projectId && !panelStack.some(p => p.type === 'project' && p.id === projectId)) {
       pushPanel({ type: 'project', id: projectId });
     }
-  }, [orgSlug, screen, taskId, projectId]);
-
-  // Sync activeScreen state changes back into URL if changed programmatically
-  useEffect(() => {
-    const currentBase = `/${currentOrgSlug || 'epicordia'}`;
-    if (location.pathname.startsWith(currentBase)) {
-      const targetPath = `${currentBase}/${activeScreen}`;
-      if (location.pathname !== targetPath && !taskId && !projectId) {
-        navigate(targetPath, { replace: false });
-      }
-    }
-  }, [activeScreen, currentOrgSlug]);
+  }, [orgSlug, screen, taskId, projectId, location.pathname, currentOrgSlug]);
 
   return null;
 };
 
 const MainLayout: React.FC = () => {
-  const { activeScreen, isDarkMode } = useApp();
+  const { activeScreen, isDarkMode, isWorkspaceLoading } = useApp();
 
   const [isPrivilegesOpen, setIsPrivilegesOpen] = useState(false);
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false);
@@ -115,7 +107,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#F4F5F7] dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 overflow-hidden font-sans selection:bg-neutral-200 dark:selection:bg-neutral-800">
+    <div className="flex flex-col h-screen bg-[#F4F5F7] dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 overflow-hidden font-sans selection:bg-neutral-200 dark:selection:bg-neutral-800 relative">
       <OrgRouteSync />
 
       {/* Top Persistent Role Switcher Toolbar */}
@@ -149,6 +141,11 @@ const MainLayout: React.FC = () => {
         </div>
       </div>
 
+      {/* Floating Glass Background Blur Loading Screen */}
+      <AnimatePresence>
+        {isWorkspaceLoading && <WorkspaceGlassLoader />}
+      </AnimatePresence>
+
       {/* Slide-over Drawer for Entity Details & Stacked Panels */}
       <SlideOverDrawer />
 
@@ -178,11 +175,28 @@ const MainLayout: React.FC = () => {
 };
 
 const RootRedirector: React.FC = () => {
-  const authCookie = localStorage.getItem('pulse_auth_token');
-  if (!authCookie) {
-    return <Navigate to="/welcome" replace />;
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [targetRedirect, setTargetRedirect] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error || !session?.user) {
+        setTargetRedirect('/welcome');
+        setSessionChecked(true);
+        return;
+      }
+
+      // Stop taking user to an organization by default when opening the app; take to select-org
+      setTargetRedirect('/select-org');
+      setSessionChecked(true);
+    });
+  }, []);
+
+  if (!sessionChecked) {
+    return <WorkspaceGlassLoader />;
   }
-  return <Navigate to="/select-org" replace />;
+
+  return <Navigate to={targetRedirect || '/welcome'} replace />;
 };
 
 export default function App() {
@@ -218,7 +232,7 @@ export default function App() {
           <Route path="/join-org" element={<JoinOrgScreen />} />
           <Route path="/invite/:token" element={
             <InviteAcceptanceScreen onComplete={() => {
-              const slug = localStorage.getItem('pulse_tenant_slug') || 'apexdynamics';
+              const slug = localStorage.getItem('pulse_tenant_slug') || 'epicordia';
               window.location.href = `/${slug}/dashboard`;
             }} />
           } />
@@ -227,20 +241,25 @@ export default function App() {
           <Route path="/:orgSlug" element={<TenantGuard><Outlet /></TenantGuard>}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="waiting-room" element={<WaitingRoomScreen />} />
-            <Route path="dashboard" element={<MainLayout />} />
-            <Route path="tasks" element={<MainLayout />} />
-            <Route path="tasks/:taskId" element={<MainLayout />} />
-            <Route path="pulse" element={<MainLayout />} />
-            <Route path="relationships" element={<MainLayout />} />
-            <Route path="projects" element={<MainLayout />} />
-            <Route path="projects/:projectId" element={<MainLayout />} />
-            <Route path="goals" element={<MainLayout />} />
-            <Route path="analytics" element={<MainLayout />} />
-            <Route path="reports" element={<MainLayout />} />
-            <Route path="team" element={<MainLayout />} />
-            <Route path="admin" element={<MainLayout />} />
-            <Route path="notifications" element={<MainLayout />} />
-            <Route path=":screen" element={<MainLayout />} />
+            <Route element={<MainLayout />}>
+              <Route path="dashboard" element={null} />
+              <Route path="tasks" element={null} />
+              <Route path="tasks/:taskId" element={null} />
+              <Route path="pulse" element={null} />
+              <Route path="relationships" element={null} />
+              <Route path="spiderweb-relationships" element={null} />
+              <Route path="lab-relationships" element={null} />
+              <Route path="projects" element={null} />
+              <Route path="projects/:projectId" element={null} />
+              <Route path="goals" element={null} />
+              <Route path="analytics" element={null} />
+              <Route path="reports" element={null} />
+              <Route path="team" element={null} />
+              <Route path="admin" element={null} />
+              <Route path="archive" element={null} />
+              <Route path="notifications" element={null} />
+              <Route path=":screen" element={null} />
+            </Route>
           </Route>
 
           {/* Catch-all fallback */}

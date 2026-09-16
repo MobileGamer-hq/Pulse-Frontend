@@ -4,11 +4,22 @@ import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { 
   Search, Plus, LayoutGrid, List, ChevronDown, 
-  Target, CheckCircle2, GripVertical, FolderGit2 
+  Target, CheckCircle2, GripVertical, FolderGit2, RotateCw
 } from 'lucide-react';
+import { getProjectContributors } from '../../utils/projectContributors';
 
 export const ProjectsScreen: React.FC = () => {
-  const { pushPanel, projects, tasks, users, reorderProjects } = useApp();
+  const { pushPanel, projects, tasks, users, teams, reorderProjects, refreshWorkspaceData } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshWorkspaceData(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,11 +31,14 @@ export const ProjectsScreen: React.FC = () => {
 
   React.useEffect(() => {
     const items = projects.map(p => {
-      const projectTasks = tasks.filter(t => t.projectId === p.id);
+      const projectTasks = tasks.filter(t => 
+        t.projectId === p.id ||
+        (t.projectName && p.name && t.projectName.toLowerCase() === p.name.toLowerCase())
+      );
       const doneCount = projectTasks.filter(t => t.status === 'Done').length;
       const targetCount = projectTasks.length;
       const progress = targetCount > 0 ? Math.round((doneCount / targetCount) * 100) : (p.status === 'Completed' ? 100 : 0);
-      const memberUsers = users.filter(u => p.memberIds?.includes(u.id));
+      const memberUsers = getProjectContributors(p, teams, users, tasks);
       const avatars = memberUsers.slice(0, 3).map(u => ({ name: u.name, avatarUrl: u.avatarUrl }));
       const extraAvatars = Math.max(0, memberUsers.length - 3);
 
@@ -41,7 +55,7 @@ export const ProjectsScreen: React.FC = () => {
       };
     });
     setProjectItems(items);
-  }, [projects, tasks, users]);
+  }, [projects, tasks, users, teams]);
 
   const [draggedPrjId, setDraggedPrjId] = useState<string | null>(null);
   const [dragOverPrjId, setDragOverPrjId] = useState<string | null>(null);
@@ -71,6 +85,17 @@ export const ProjectsScreen: React.FC = () => {
   const filteredProjects = projectItems.filter(p => {
     if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase()) && !p.code.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (statusFilter !== 'All' && p.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+    if (deptFilter !== 'All') {
+      const prjObj = projects.find(proj => proj.id === p.id);
+      const prjTeam = teams.find(t => t.id === prjObj?.teamId);
+      if (!prjTeam || prjTeam.name.toLowerCase() !== deptFilter.toLowerCase()) return false;
+    }
+    if (ownerFilter !== 'All') {
+      const prjObj = projects.find(proj => proj.id === p.id);
+      const prjLead = users.find(u => u.id === prjObj?.leadId);
+      const leadName = prjLead?.name || prjObj?.leadName;
+      if (!leadName || leadName.toLowerCase() !== ownerFilter.toLowerCase()) return false;
+    }
     return true;
   });
 
@@ -98,8 +123,17 @@ export const ProjectsScreen: React.FC = () => {
             }))}
           />
           <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0 font-mono"
+            title="Sync projects with database"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+          <button
             onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'project' } }))}
-            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm"
+            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             Create Project
@@ -127,10 +161,10 @@ export const ProjectsScreen: React.FC = () => {
               onChange={e => setStatusFilter(e.target.value)}
               className="appearance-none px-3.5 py-1.5 pr-8 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-none"
             >
+              <option value="All">Status: All</option>
               <option value="Active">Status: Active</option>
               <option value="Planning">Status: Planning</option>
               <option value="Completed">Status: Completed</option>
-              <option value="All">Status: All</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -141,9 +175,10 @@ export const ProjectsScreen: React.FC = () => {
               onChange={e => setDeptFilter(e.target.value)}
               className="appearance-none px-3.5 py-1.5 pr-8 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-none"
             >
-              <option value="Engineering">Dept: Engineering</option>
-              <option value="Product">Dept: Product</option>
-              <option value="Design">Dept: Design</option>
+              <option value="All">Dept: All</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.name}>Dept: {t.name}</option>
+              ))}
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -155,6 +190,9 @@ export const ProjectsScreen: React.FC = () => {
               className="appearance-none px-3.5 py-1.5 pr-8 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-none"
             >
               <option value="All">Owner: All</option>
+              {users.map(u => (
+                <option key={u.id} value={u.name}>Owner: {u.name}</option>
+              ))}
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -256,9 +294,13 @@ export const ProjectsScreen: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800">
                   <div className="flex items-center -space-x-1.5">
-                    {prj.avatars.map((name: string, i: number) => (
-                      <UserAvatar key={i} name={name} size="xs" />
-                    ))}
+                    {prj.avatars.map((av: any, i: number) => {
+                      const avName = typeof av === 'string' ? av : av?.name || 'User';
+                      const avUrl = typeof av === 'object' ? av?.avatarUrl : undefined;
+                      return (
+                        <UserAvatar key={i} name={avName} avatarUrl={avUrl} size="xs" />
+                      );
+                    })}
                     {prj.extraAvatars > 0 && (
                       <span className="w-5 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-white dark:border-neutral-900 flex items-center justify-center text-[8px] font-bold text-neutral-600 dark:text-neutral-400">
                         +{prj.extraAvatars}

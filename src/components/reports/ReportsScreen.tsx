@@ -8,24 +8,24 @@ import {
   Search, Download, Share2, FileText, 
   CheckCircle2, AlertTriangle, X, ChevronDown, 
   Calendar, FileCode, FileSpreadsheet, Check,
-  TrendingUp, Target, Loader2
+  TrendingUp, Target, Loader2, RotateCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
-const DAILY_THROUGHPUT_DATA = [
-  { day: 'Mon', throughput: 40 },
-  { day: 'Tue', throughput: 65 },
-  { day: 'Wed', throughput: 50 },
-  { day: 'Thu', throughput: 90 },
-  { day: 'Fri', throughput: 80 },
-  { day: 'Sat', throughput: 110 },
-  { day: 'Sun', throughput: 95 }
-];
-
 export const ReportsScreen: React.FC = () => {
-  const { reports, currentOrgSlug, generateReport, tasks } = useApp();
+  const { reports, currentOrgSlug, generateReport, tasks, refreshWorkspaceData } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshWorkspaceData(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   // Screen state: 'library' | 'brief'
   const [viewMode, setViewMode] = useState<'library' | 'brief'>('library');
@@ -130,13 +130,25 @@ export const ReportsScreen: React.FC = () => {
               <p className="text-xs text-neutral-500 font-mono mt-0.5">Access and manage all generated analytical briefs.</p>
             </div>
 
-            <button
-              onClick={() => setShowExportDrawer(true)}
-              className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Generate New Report
-            </button>
+            <div className="flex items-center gap-2 font-mono">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Sync reports with database"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowExportDrawer(true)}
+                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Generate New Report
+              </button>
+            </div>
           </div>
 
           {/* Table Container matching Screenshot 1 */}
@@ -377,44 +389,38 @@ export const ReportsScreen: React.FC = () => {
                 Next Week Focus
               </h3>
 
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black shrink-0" />
-                    <span>Finalize Auth Migration</span>
+              {(() => {
+                const upcoming = tasks.filter(t => t.status === 'InProgress' || t.status === 'Todo');
+                if (upcoming.length === 0) {
+                  return (
+                    <div className="py-6 text-center text-xs text-neutral-400 dark:text-neutral-600 font-sans">
+                      No upcoming tasks currently queued for next week.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-3 text-xs">
+                    {upcoming.slice(0, 3).map(task => (
+                      <div key={task.id} className="space-y-1">
+                        <div className="flex items-center gap-2 font-bold">
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black shrink-0" />
+                          <span>{task.title}</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 dark:text-neutral-700 pl-5 leading-relaxed font-sans">
+                          {task.description || `Active initiative in ${task.projectName || 'workspace'}.`}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[11px] text-neutral-300 dark:text-neutral-700 pl-5 leading-relaxed font-sans">
-                    Complete transition to new OAuth2 provider before Friday cut-off.
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black shrink-0" />
-                    <span>QA Pipeline Refactor</span>
-                  </div>
-                  <p className="text-[11px] text-neutral-300 dark:text-neutral-700 pl-5 leading-relaxed font-sans">
-                    Address the latency issues in e2e testing suite.
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black shrink-0" />
-                    <span>Q4 Planning Sync</span>
-                  </div>
-                  <p className="text-[11px] text-neutral-300 dark:text-neutral-700 pl-5 leading-relaxed font-sans">
-                    Cross-functional review of Q4 OKRs and resource allocation.
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Middle Section: Velocity & Throughput Chart matching Screenshot 2 */}
+          {/* Middle Section: Velocity & Throughput Chart */}
           <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4 font-mono">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 font-sans">Velocity & Throughput</h3>
+              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 font-sans">Velocity &amp; Throughput</h3>
               <div className="flex items-center gap-3 text-[10px]">
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-xs bg-black dark:bg-white" /> Throughput</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-xs bg-neutral-300" /> Capacity</span>
@@ -422,19 +428,29 @@ export const ReportsScreen: React.FC = () => {
             </div>
 
             <div className="h-52 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={DAILY_THROUGHPUT_DATA}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E4E9" opacity={0.3} />
-                  <XAxis dataKey="day" stroke="#9CA3AF" fontSize={10} />
-                  <YAxis domain={[0, 150]} stroke="#9CA3AF" fontSize={10} />
-                  <Tooltip contentStyle={{ backgroundColor: '#14161F', borderRadius: '8px', color: '#FFF' }} />
-                  <Bar dataKey="throughput" fill="#14161F" />
-                </BarChart>
-              </ResponsiveContainer>
+              {(() => {
+                const doneCount = tasks.filter(t => t.status === 'Done').length;
+                const dynamicThroughput = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+                  day,
+                  throughput: doneCount > 0 ? Math.max(5, Math.round((doneCount * 12) / 7)) : 0
+                }));
+
+                return (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dynamicThroughput}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E4E9" opacity={0.3} />
+                      <XAxis dataKey="day" stroke="#9CA3AF" fontSize={10} />
+                      <YAxis domain={[0, Math.max(50, doneCount * 15)]} stroke="#9CA3AF" fontSize={10} />
+                      <Tooltip contentStyle={{ backgroundColor: '#14161F', borderRadius: '8px', color: '#FFF' }} />
+                      <Bar dataKey="throughput" fill="#14161F" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Bottom Section: Key Accomplishments & Blockers matching Screenshot 2 */}
+          {/* Bottom Section: Key Accomplishments & Blockers */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono">
             {/* Key Accomplishments Card */}
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
@@ -443,77 +459,76 @@ export const ReportsScreen: React.FC = () => {
               </h3>
 
               <div className="space-y-3 font-sans">
-                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1 text-xs">
-                  <div className="font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-black dark:text-white" /> Deployed v2.4 Core Refactor
-                  </div>
-                  <p className="text-[11px] text-neutral-500 leading-relaxed">
-                    Successfully merged to master with zero rollback incidents. API latency reduced by 14%.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1 text-xs">
-                  <div className="font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-black dark:text-white" /> Closed 18 Critical Legacy Bugs
-                  </div>
-                  <p className="text-[11px] text-neutral-500 leading-relaxed">
-                    QA team validated fixes across staging. Technical debt backlog reduced by 5%.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1 text-xs">
-                  <div className="font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-black dark:text-white" /> Design System Audit Completed
-                  </div>
-                  <p className="text-[11px] text-neutral-500 leading-relaxed">
-                    Documented 42 inconsistencies and created tracking epics for resolution in Q4.
-                  </p>
-                </div>
+                {(() => {
+                  const completed = tasks.filter(t => t.status === 'Done');
+                  if (completed.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-xs text-neutral-400 font-sans border border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl">
+                        No tasks marked as completed yet in this report cycle.
+                      </div>
+                    );
+                  }
+                  return completed.slice(0, 4).map(task => (
+                    <div key={task.id} className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1 text-xs">
+                      <div className="font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-black dark:text-white" /> {task.title}
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        {task.description || `Successfully completed in ${task.projectName || 'workspace'}.`}
+                      </p>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
 
             {/* Blockers & Risks Card */}
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4 font-mono">
               <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 font-sans flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-neutral-800 dark:text-neutral-200" /> Blockers & Risks
+                <AlertTriangle className="w-4 h-4 text-neutral-800 dark:text-neutral-200" /> Blockers &amp; Risks
               </h3>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
-                    <tr>
-                      <th className="pb-2">Sts</th>
-                      <th className="pb-2">Issue Description</th>
-                      <th className="pb-2 text-right">Impact</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    <tr>
-                      <td className="py-3">•</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">QA Staging Environment Instability</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-800 border border-neutral-300">HIGH</span>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3">•</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">Delay in 3rd Party API Documentation</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">MED</span>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3">•</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">Resource Constraint on Mobile Team</td>
-                      <td className="py-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-300">LOW</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                const blocked = tasks.filter(t => t.status === 'Blocked');
+                if (blocked.length === 0) {
+                  return (
+                    <div className="p-6 text-center text-xs text-neutral-400 font-sans border border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl">
+                      No active blockers reported. All initiatives running on schedule.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
+                        <tr>
+                          <th className="pb-2">Sts</th>
+                          <th className="pb-2">Issue Description</th>
+                          <th className="pb-2 text-right">Impact</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {blocked.map(task => (
+                          <tr key={task.id}>
+                            <td className="py-3 text-red-500">•</td>
+                            <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">
+                              {task.title}
+                              {task.blockedReason && (
+                                <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{task.blockedReason}</div>
+                              )}
+                            </td>
+                            <td className="py-3 text-right">
+                              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-800 border border-neutral-300">
+                                {task.priority === 'Urgent' ? 'CRITICAL' : task.priority === 'High' ? 'HIGH' : 'MED'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

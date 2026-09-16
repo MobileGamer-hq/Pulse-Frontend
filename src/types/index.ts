@@ -4,7 +4,17 @@ export type Priority = 'Urgent' | 'High' | 'Medium' | 'Low';
 
 export type TaskStatus = 'Todo' | 'InProgress' | 'AtRisk' | 'Blocked' | 'Done';
 
-export type WorkflowTemplate = 'SoftwareSprint' | 'BugTracking' | 'MarketingCampaign' | 'ClientOnboarding' | 'GeneralOps';
+export type WorkflowTemplate = 
+  | 'SoftwareSprint' 
+  | 'BugTracking' 
+  | 'MarketingCampaign' 
+  | 'ClientOnboarding' 
+  | 'GeneralOps' 
+  | 'KanbanFlow' 
+  | 'MarketingLaunch' 
+  | 'SalesPipeline' 
+  | 'DesignSystem' 
+  | 'ExecutiveStrategy';
 
 export type EntityType = 'person' | 'project' | 'task' | 'goal' | 'tag' | 'team';
 
@@ -127,7 +137,9 @@ export interface Project {
   templateType: WorkflowTemplate;
   teamId: string;
   teamIds?: string[]; // Multi-team project connections
+  teamName?: string;
   leadId: string;
+  leadName?: string;
   memberIds: string[];
   tagIds: string[];
   linkedGoalIds: string[];
@@ -212,13 +224,14 @@ export interface Notification {
   orgId: string;
   recipientId: string;
   senderId?: string;
-  type: 'waiting_room_approval' | 'waiting_room_approved' | 'blocker_flagged' | 'task_assignment' | 'mention' | 'report_ready' | 'system';
+  type: 'waiting_room_approval' | 'waiting_room_approved' | 'blocker_flagged' | 'task_assignment' | 'mention' | 'report_ready' | 'system' | 'access_request';
   title: string;
   body: string;
   linkUrl?: string;
   isRead: boolean;
   readAt?: string;
   createdAt: string;
+  metadata?: any;
   sender?: {
     id: string;
     fullName: string;

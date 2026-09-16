@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
@@ -6,21 +7,42 @@ import {
   List, LayoutGrid, GitCommit, Users, Filter, X, 
   ChevronDown, ChevronRight, CheckCircle2, Plus,
   MessageSquare, Calendar, AlertTriangle, GripVertical,
-  Check, ArrowUp 
+  Check, ArrowUp, RotateCw
 } from 'lucide-react';
 import type { TaskStatus } from '../../types';
 
 type ViewMode = 'list' | 'kanban' | 'timeline' | 'workload';
 
 export const TasksScreen: React.FC = () => {
-  const { tasks, projects, users, tags, pushPanel, reorderTasks } = useApp();
+  const { tasks, projects, users, tags, pushPanel, reorderTasks, refreshWorkspaceData } = useApp();
+  const location = useLocation();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshWorkspaceData(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedAssignee, setSelectedAssignee] = useState<string>('All');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [selectedPriority, setSelectedPriority] = useState<string>('All');
+  const [selectedProject, setSelectedProject] = useState<string>('All');
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.status) {
+      setSelectedStatus(location.state.status);
+    }
+    if (location.state?.projectId) {
+      setSelectedProject(location.state.projectId);
+    }
+  }, [location.state]);
 
   // Drag and Drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -65,13 +87,10 @@ export const TasksScreen: React.FC = () => {
   };
 
   // Grouping expand/collapse for Timeline view
-  const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({
-    'q3-release': true,
-    'mkt-campaign': true
-  });
+  const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
 
   const toggleGroup = (id: string) => {
-    setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedGroups(prev => ({ ...prev, [id]: prev[id] === false ? true : false }));
   };
 
   const clearFilters = () => {
@@ -79,6 +98,7 @@ export const TasksScreen: React.FC = () => {
     setSelectedAssignee('All');
     setSelectedTag('All');
     setSelectedPriority('All');
+    setSelectedProject('All');
     setHighPriorityOnly(false);
   };
 
@@ -88,6 +108,11 @@ export const TasksScreen: React.FC = () => {
     if (selectedTag !== 'All' && !t.tagIds.includes(selectedTag)) return false;
     if (selectedPriority !== 'All' && t.priority !== selectedPriority) return false;
     if (highPriorityOnly && t.priority !== 'Urgent' && t.priority !== 'High') return false;
+    if (selectedProject !== 'All') {
+      const matchProj = projects.find(p => p.id === selectedProject);
+      const isMatch = t.projectId === selectedProject || (matchProj && t.projectName && t.projectName.toLowerCase() === matchProj.name.toLowerCase());
+      if (!isMatch) return false;
+    }
     return true;
   });
 
@@ -180,6 +205,16 @@ export const TasksScreen: React.FC = () => {
           />
 
           <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0"
+            title="Sync tasks with database"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          <button
             onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'task' } }))}
             className="px-3 py-1.5 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs shrink-0"
           >
@@ -244,6 +279,18 @@ export const TasksScreen: React.FC = () => {
             <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
+          </select>
+
+          {/* Project Dropdown */}
+          <select
+            value={selectedProject}
+            onChange={e => setSelectedProject(e.target.value)}
+            className="px-2.5 py-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none max-w-[140px] truncate"
+          >
+            <option value="All">Project: All ▾</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
 
           {/* Active Filter Pill */}
@@ -654,135 +701,248 @@ export const TasksScreen: React.FC = () => {
         </div>
       ) : viewMode === 'timeline' ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
-          <div className="overflow-x-auto relative">
-            {/* Red Today Line */}
-            <div className="absolute top-0 bottom-0 left-[58%] w-0.5 bg-red-500 z-10 pointer-events-none">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1 -mt-1" />
+          {projects.length === 0 && filteredTasks.length === 0 ? (
+            <div className="p-12 text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                <GitCommit className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No initiatives or tasks to display</p>
+              <p className="text-[11px] text-neutral-500 font-mono">Create projects and tasks to visualize your execution timeline.</p>
             </div>
+          ) : (
+            <div className="overflow-x-auto relative">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead className="border-b border-neutral-200 dark:border-neutral-800 uppercase text-[10px] text-neutral-400">
+                  <tr>
+                    <th className="py-2.5 px-4 w-72">Initiative / Task</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Status</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Priority</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Due Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {projects.map(proj => {
+                    const isExpanded = expandedGroups[proj.id] ?? true;
+                    const projTasks = filteredTasks.filter(t => 
+                      t.projectId === proj.id ||
+                      (t.projectName && proj.name && t.projectName.toLowerCase() === proj.name.toLowerCase())
+                    );
+                    const completedCount = projTasks.filter(t => t.status === 'Done').length;
+                    const progressPct = projTasks.length > 0 ? Math.round((completedCount / projTasks.length) * 100) : 0;
 
-            <table className="w-full text-left text-xs font-mono border-collapse">
-              <thead className="border-b border-neutral-200 dark:border-neutral-800 uppercase text-[10px] text-neutral-400">
-                <tr>
-                  <th className="py-2.5 px-4 w-64">Task Name</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Week 32</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Week 33</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Week 34</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {/* Group 1 */}
-                <tr className="bg-neutral-50/50 dark:bg-neutral-800/20 font-bold">
-                  <td className="py-3 px-4 flex items-center gap-1.5 cursor-pointer" onClick={() => toggleGroup('q3-release')}>
-                    {expandedGroups['q3-release'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    Q3 Platform Release
-                  </td>
-                  <td colSpan={3} className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-[65%] ml-[30%] py-1.5 px-3 rounded bg-black text-white dark:bg-white dark:text-black text-[11px] font-mono font-bold shadow-xs">
-                      Q3 Platform Release
-                    </div>
-                  </td>
-                </tr>
+                    return (
+                      <React.Fragment key={proj.id}>
+                        <tr className="bg-neutral-50/50 dark:bg-neutral-800/20 font-bold">
+                          <td 
+                            className="py-3 px-4 flex items-center gap-1.5 cursor-pointer hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors" 
+                            onClick={() => toggleGroup(proj.id)}
+                          >
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+                            <span className="truncate">{proj.name}</span>
+                          </td>
+                          <td colSpan={3} className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 bg-neutral-200 dark:bg-neutral-700 h-2 rounded-full overflow-hidden">
+                                <div className="bg-black dark:bg-white h-full rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-neutral-500 shrink-0">{completedCount}/{projTasks.length} Done ({progressPct}%)</span>
+                            </div>
+                          </td>
+                        </tr>
 
-                {expandedGroups['q3-release'] && (
-                  <>
-                    <tr>
-                      <td className="py-2.5 pl-8 pr-4 text-neutral-600 dark:text-neutral-400">Backend Architecture</td>
-                      <td colSpan={3} className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                        <div className="w-[35%] ml-[30%] h-4 rounded bg-neutral-600 dark:bg-neutral-400" />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pl-8 pr-4 text-neutral-600 dark:text-neutral-400">API Integration</td>
-                      <td colSpan={3} className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                        <div className="w-[30%] ml-[55%] h-4 rounded bg-neutral-600 dark:bg-neutral-400" />
-                      </td>
-                    </tr>
-                  </>
-                )}
+                        {isExpanded && projTasks.map(task => (
+                          <tr 
+                            key={task.id} 
+                            onClick={() => pushPanel({ type: 'task', id: task.id })}
+                            className="hover:bg-neutral-50 dark:hover:bg-neutral-800/40 cursor-pointer transition-colors"
+                          >
+                            <td className="py-2.5 pl-8 pr-4 text-neutral-700 dark:text-neutral-300 font-sans flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                task.status === 'Done' ? 'bg-emerald-500' :
+                                task.status === 'Blocked' ? 'bg-red-500' :
+                                task.status === 'InProgress' ? 'bg-amber-500' : 'bg-neutral-400'
+                              }`} />
+                              <span className="truncate font-medium">{task.title}</span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                {task.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                task.priority === 'Urgent' || task.priority === 'High' 
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' 
+                                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                              }`}>
+                                {task.priority}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center text-[11px] text-neutral-500">
+                              {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
+                            </td>
+                          </tr>
+                        ))}
 
-                {/* Group 2 */}
-                <tr className="bg-neutral-50/50 dark:bg-neutral-800/20 font-bold">
-                  <td className="py-3 px-4 flex items-center gap-1.5 cursor-pointer" onClick={() => toggleGroup('mkt-campaign')}>
-                    {expandedGroups['mkt-campaign'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    Marketing Campaign
-                  </td>
-                  <td colSpan={3} className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-[45%] ml-[50%] py-1.5 px-3 rounded bg-neutral-700 text-white text-[11px] font-mono font-bold">
-                      Marketing Campaign
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                        {isExpanded && projTasks.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="py-2 pl-8 text-neutral-400 text-[11px] italic font-sans">
+                              No tasks in this initiative yet.
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Tasks without projects */}
+                  {(() => {
+                    const unassignedTasks = filteredTasks.filter(t => 
+                      !t.projectId && (!t.projectName || !projects.some(p => p.name.toLowerCase() === t.projectName.toLowerCase()))
+                    );
+                    if (unassignedTasks.length === 0) return null;
+                    const isExpanded = expandedGroups['unassigned-tasks'] ?? true;
+
+                    return (
+                      <React.Fragment key="unassigned">
+                        <tr className="bg-neutral-50/50 dark:bg-neutral-800/20 font-bold">
+                          <td 
+                            className="py-3 px-4 flex items-center gap-1.5 cursor-pointer hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors" 
+                            onClick={() => toggleGroup('unassigned-tasks')}
+                          >
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+                            <span>General Workspace Tasks</span>
+                          </td>
+                          <td colSpan={3} className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-[10px] text-neutral-400">
+                            {unassignedTasks.length} Standalone Tasks
+                          </td>
+                        </tr>
+                        {isExpanded && unassignedTasks.map(task => (
+                          <tr 
+                            key={task.id} 
+                            onClick={() => pushPanel({ type: 'task', id: task.id })}
+                            className="hover:bg-neutral-50 dark:hover:bg-neutral-800/40 cursor-pointer transition-colors"
+                          >
+                            <td className="py-2.5 pl-8 pr-4 text-neutral-700 dark:text-neutral-300 font-sans flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                task.status === 'Done' ? 'bg-emerald-500' :
+                                task.status === 'Blocked' ? 'bg-red-500' :
+                                task.status === 'InProgress' ? 'bg-amber-500' : 'bg-neutral-400'
+                              }`} />
+                              <span className="truncate font-medium">{task.title}</span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                {task.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                task.priority === 'Urgent' || task.priority === 'High' 
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' 
+                                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                              }`}>
+                                {task.priority}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center text-[11px] text-neutral-500">
+                              {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : viewMode === 'workload' ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4 font-mono">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="border-b border-neutral-200 dark:border-neutral-800 uppercase text-[10px] text-neutral-400">
-                <tr>
-                  <th className="py-2.5 px-4 w-56">Resource</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">M 12</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">T 13</th>
-                  <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">W 14</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {/* Resource 1 */}
-                <tr>
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-neutral-900 dark:text-neutral-100">Alex Chen</div>
-                    <div className="text-[10px] text-neutral-400">Frontend Eng</div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-full bg-neutral-200 dark:bg-neutral-700 h-6 rounded flex items-center justify-center text-[10px] font-bold text-neutral-800 dark:text-neutral-200">
-                      6h
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-full bg-neutral-300 dark:bg-neutral-600 h-6 rounded flex items-center justify-center text-[10px] font-bold text-neutral-900 dark:text-neutral-100">
-                      8h
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center text-neutral-400 font-mono text-xs">
-                    0h
-                  </td>
-                </tr>
+          {users.length === 0 ? (
+            <div className="p-12 text-center space-y-2 font-sans">
+              <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                <Users className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No team members found</p>
+              <p className="text-[11px] text-neutral-500">Invite team members to visualize resource capacity and workload distribution.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="border-b border-neutral-200 dark:border-neutral-800 uppercase text-[10px] text-neutral-400">
+                  <tr>
+                    <th className="py-2.5 px-4 w-64">Team Member</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Active Tasks</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Completed</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Est. Hours</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Capacity Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {users.map(u => {
+                    const uTasks = tasks.filter(t => t.assigneeIds?.includes(u.id));
+                    const activeTasks = uTasks.filter(t => t.status !== 'Done');
+                    const doneTasks = uTasks.filter(t => t.status === 'Done');
+                    const totalHours = activeTasks.reduce((s, t) => s + (t.estimatedHours || 4), 0);
+                    const isOverbooked = totalHours > 40 || activeTasks.length > 5;
 
-                {/* Resource 2: Overbooked Alert */}
-                <tr>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-neutral-100">
-                      Sarah Jenkins <AlertTriangle className="w-3.5 h-3.5 text-neutral-900 dark:text-neutral-100" />
-                    </div>
-                    <div className="text-[10px] text-neutral-400">Backend Lead</div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-full bg-black text-white dark:bg-white dark:text-black h-6 rounded flex items-center justify-center text-[10px] font-bold">
-                      10h
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-full bg-black text-white dark:bg-white dark:text-black h-6 rounded flex items-center justify-center text-[10px] font-bold">
-                      9h
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800">
-                    <div className="w-[60%] bg-neutral-300 dark:bg-neutral-600 h-6 rounded flex items-center justify-center text-[10px] font-bold">
-                      4h
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr 
+                        key={u.id}
+                        onClick={() => pushPanel({ type: 'person', id: u.id })}
+                        className="hover:bg-neutral-50 dark:hover:bg-neutral-800/40 cursor-pointer transition-colors"
+                      >
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <UserAvatar name={u.name} avatarUrl={u.avatarUrl} size="sm" />
+                            <div>
+                              <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-neutral-100 font-sans">
+                                {u.name}
+                                {isOverbooked && (
+                                  <span title="High workload detected">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-neutral-400 font-mono">{u.role || u.title || 'Member'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center font-bold text-neutral-800 dark:text-neutral-200">
+                          {activeTasks.length}
+                        </td>
+                        <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center text-emerald-600 font-bold">
+                          {doneTasks.length}
+                        </td>
+                        <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center font-mono">
+                          {totalHours}h
+                        </td>
+                        <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
+                          {isOverbooked ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              Overbooked
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                              Optimal
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center text-[11px] text-neutral-500">
-            <span>Total Resources: 12</span>
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-neutral-300" /> Available</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-black dark:bg-white" /> Overbooked</span>
+          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center text-[11px] text-neutral-500 font-sans">
+            <span>Total Team Members: {users.length}</span>
+            <div className="flex items-center gap-4 font-mono text-[10px]">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Optimal</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Overbooked</span>
             </div>
           </div>
         </div>

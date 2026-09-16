@@ -9,14 +9,16 @@ interface AccessDeniedScreenProps {
 }
 
 export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({ orgSlug = 'organization' }) => {
-  const { currentUser } = useApp();
+  const { currentUser, userOrgs } = useApp();
   const navigate = useNavigate();
   const [requestSent, setRequestSent] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const formattedOrgName = orgSlug
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+  const matchedOrg = (userOrgs || []).find(o => (o.slug || '').toLowerCase() === (orgSlug || '').toLowerCase());
+  const formattedOrgName = matchedOrg?.name || orgSlug
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 
   const handleRequestAccess = () => {
     setIsSending(true);
@@ -93,12 +95,22 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({ orgSlug 
           </button>
 
           <button
-            onClick={() => navigate('/epicordia/dashboard')}
+            onClick={() => {
+              try {
+                const userOrgs = JSON.parse(localStorage.getItem('pulse_user_orgs') || '[]');
+                if (Array.isArray(userOrgs) && userOrgs.length > 0 && userOrgs[0].slug) {
+                  navigate(`/${userOrgs[0].slug}/dashboard`);
+                  return;
+                }
+              } catch (e) {}
+              navigate('/select-org');
+            }}
             className="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold transition-colors flex items-center justify-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to My Workspace</span>
           </button>
+
         </div>
       </div>
     </div>

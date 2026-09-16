@@ -10,7 +10,7 @@ import { TagDetailPanel } from '../admin/TagDetailPanel';
 import { RelationshipMap } from '../projects/RelationshipMap';
 
 export const SlideOverDrawer: React.FC = () => {
-  const { panelStack, popPanel, closeAllPanels, tasks, projects, users, goals, tags } = useApp();
+  const { panelStack, popPanel, closeAllPanels, tasks, projects, goals, tags } = useApp();
 
   if (panelStack.length === 0) return null;
 
@@ -21,7 +21,7 @@ export const SlideOverDrawer: React.FC = () => {
     switch (panel.type) {
       case 'task': return tasks.find(t => t.id === panel.id)?.title || 'Task Detail';
       case 'project': return projects.find(p => p.id === panel.id)?.name || 'Project Detail';
-      case 'person': return users.find(u => u.id === panel.id)?.name || 'Person Profile';
+      case 'person': return 'Member Profile';
       case 'goal': return goals.find(g => g.id === panel.id)?.title || 'Goal Detail';
       case 'tag': return tags.find(t => t.id === panel.id)?.name || 'Tag Detail';
       case 'relationship-map': return 'Relationship Map';

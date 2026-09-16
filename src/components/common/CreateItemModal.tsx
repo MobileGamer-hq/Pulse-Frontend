@@ -22,17 +22,74 @@ const ITEM_META: Record<ItemType, { title: string; icon: React.FC<{ className?: 
   tag: { title: 'Create Tag', icon: TagIcon }
 };
 
+const ENTITY_EXPLANATIONS: Record<ItemType, { subtitle: string; description: string; tips: string[] }> = {
+  task: {
+    subtitle: 'Actionable Unit of Work',
+    description: 'A task is an actionable work item assigned to one or more teammates. It tracks status, priority, time estimates, and checklist subtasks within a parent project.',
+    tips: [
+      'Assign tasks to an active project to track milestone delivery.',
+      'Add checklist subtasks for multi-step tasks.',
+      'Accurate hour estimates help forecast team capacity.'
+    ]
+  },
+  project: {
+    subtitle: 'Strategic Project Initiative',
+    description: 'A project groups related tasks, milestones, and deliverables under a dedicated workflow template (e.g. Software Sprint, Kanban, Marketing Campaign).',
+    tips: [
+      'Assign a Project Lead responsible for timelines and blocker triage.',
+      'Choose a workflow template that matches your team methodology.',
+      'Link projects to strategic goals to measure broader organizational impact.'
+    ]
+  },
+  goal: {
+    subtitle: 'High-Level OKR & Strategic Objective',
+    description: 'A strategic goal (Objective and Key Result) defines what the organization aims to achieve over a quarter or annual cycle with measurable key results.',
+    tips: [
+      'Set quantifiable Key Results (e.g. percentages, units, currency).',
+      'Assign ownership to the organization, a team, or an individual lead.',
+      'Track progress over time to identify bottlenecks early.'
+    ]
+  },
+  team: {
+    subtitle: 'Functional Working Group',
+    description: 'A team represents a department or squad (e.g., Engineering, Design, Core Operations) with a designated Team Lead and default workflow templates.',
+    tips: [
+      'Every project and task can affiliate with a primary team.',
+      'Team leads can manage team rosters and review daily check-ins.'
+    ]
+  },
+  member: {
+    subtitle: 'Workspace Teammate Invitation',
+    description: 'Invite new collaborators to join your Pulse workspace. Generate secure invitation tokens or shareable invite links with predefined roles and permissions.',
+    tips: [
+      'Select appropriate RBAC roles (Admin, Manager, Member, Contractor, etc.).',
+      'Assigned teams give new members immediate visibility into active projects.'
+    ]
+  },
+  tag: {
+    subtitle: 'Cross-Workflow Categorization Label',
+    description: 'Tags provide horizontal categorization across tasks, projects, goals, and team members to filter and correlate work across boundaries.',
+    tips: [
+      'Use consistent color coding for tags (e.g., #urgent, #backend, #q4-initiative).',
+      'Filter tasks in lists and relationship spiderwebs by tag.'
+    ]
+  }
+};
+
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   isOpen,
   initialType = 'task',
   onClose
 }) => {
   const { 
-    activeRole, setActiveRole, currentUser, currentOrgSlug, projects, teams, users,
-    addTask, addProject, addGoal, addTag, addUser, addTeam 
+    activeRole, currentUser, currentOrgSlug, projects, teams, users,
+    addTask, addProject, addGoal, addTag, addUser, addTeam, requestAccess 
   } = useApp();
 
   const [itemType, setItemType] = useState<ItemType>(initialType);
+  const [showInfoExplainer, setShowInfoExplainer] = useState(false);
+  const [accessRequestNote, setAccessRequestNote] = useState('');
+  const [accessRequestSent, setAccessRequestSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -43,18 +100,49 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setItemType(initialType);
+      setShowInfoExplainer(false);
+      setAccessRequestNote('');
+      setAccessRequestSent(false);
       setSuccessMessage(null);
       setSubmitError(null);
       setGeneratedInvite(null);
       setCopiedLink(false);
       setIsSubmitting(false);
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskSubtasks([]);
+      setNewModalSubtaskTitle('');
+      setNewModalSubtaskAssigneeId('');
+      setProjectName('');
+      setProjectDescription('');
+      setGoalTitle('');
+      setGoalDescription('');
+      setTagName('');
+      setTagDescription('');
+      setMemberName('');
+      setMemberEmail('');
+      setNewTeamName('');
+      setNewTeamMemberIds([]);
     }
-  }, [isOpen, initialType]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (initialType && isOpen) {
+      setItemType(initialType);
+    }
+  }, [initialType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentPrerequisite && !currentPrerequisite.met) return;
-    if (!currentPermission.allowed) return;
+    console.log('[CreateItemModal.handleSubmit] Triggered!', { itemType, memberName, memberEmail, activeRole });
+    if (currentPrerequisite && !currentPrerequisite.met) {
+      console.warn('[CreateItemModal.handleSubmit] Prerequisite not met:', currentPrerequisite);
+      return;
+    }
+    if (!currentPermission.allowed) {
+      console.warn('[CreateItemModal.handleSubmit] Permission not allowed:', currentPermission);
+      return;
+    }
 
     setSubmitError(null);
     setIsSubmitting(true);
@@ -163,15 +251,16 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         const targetTeamId = memberTeamId || teams[0]?.id;
         const team = teams.find(t => t.id === targetTeamId);
         
-        // 1. Call Backend API to generate invitation token & link
-        const inviteRes = await organizationService.createInvite(currentOrgSlug, {
+        // 1. Call Organization Service to generate invitation token & link
+        const targetSlug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+        const inviteRes = await organizationService.createInvite(targetSlug, {
           email: memberEmail.trim(),
           role: memberRole,
           teamId: targetTeamId,
         });
 
         addUser({
-          orgId: currentOrgSlug,
+          orgId: targetSlug,
           name: memberName,
           email: memberEmail,
           role: memberRole,
@@ -202,11 +291,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           return;
         }
         const leadUser = users.find(u => u.id === newTeamLeadId);
+        const finalMemberIds = Array.from(new Set(newTeamLeadId ? [newTeamLeadId, ...newTeamMemberIds] : newTeamMemberIds));
         await addTeam({
           name: newTeamName,
           leadId: newTeamLeadId,
           leadName: leadUser ? leadUser.name : currentUser.name,
-          memberIds: [newTeamLeadId],
+          memberIds: finalMemberIds,
           workflowTemplate: newTeamTemplate
         });
         setSuccessMessage(`Team "${newTeamName}" created & saved to database successfully!`);
@@ -264,6 +354,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamLeadId, setNewTeamLeadId] = useState<string>(currentUser.id);
   const [newTeamTemplate, setNewTeamTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
+  const [newTeamMemberIds, setNewTeamMemberIds] = useState<string[]>([]);
 
   // Sync selection IDs when data collections change
   useEffect(() => {
@@ -282,25 +373,6 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
       }
     }
   }, [teams]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setTaskTitle('');
-      setTaskDescription('');
-      setTaskSubtasks([]);
-      setNewModalSubtaskTitle('');
-      setNewModalSubtaskAssigneeId('');
-      setProjectName('');
-      setProjectDescription('');
-      setGoalTitle('');
-      setGoalDescription('');
-      setTagName('');
-      setTagDescription('');
-      setMemberName('');
-      setMemberEmail('');
-      setNewTeamName('');
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -424,17 +496,63 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowInfoExplainer(!showInfoExplainer)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  showInfoExplainer 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' 
+                    : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800'
+                }`}
+                title="What is this item? (Explanation & Best Practices)"
+              >
+                <Info className="w-4.5 h-4.5" />
+                <span className="hidden sm:inline font-mono text-[11px] font-bold">Explain</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Dedicated Form Content Body */}
           <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+            {showInfoExplainer && (
+              <div className="mb-5 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-200 font-sans space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>{ENTITY_EXPLANATIONS[itemType]?.subtitle || 'Item Guide'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowInfoExplainer(false)}
+                    className="text-blue-500 hover:text-blue-800 dark:hover:text-blue-100 text-[11px] font-mono cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                <p className="text-xs leading-relaxed text-blue-800 dark:text-blue-300">
+                  {ENTITY_EXPLANATIONS[itemType]?.description}
+                </p>
+                {ENTITY_EXPLANATIONS[itemType]?.tips && (
+                  <div className="pt-2 border-t border-blue-200/60 dark:border-blue-900/60">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Best Practices:</span>
+                    <ul className="list-disc list-inside mt-1 space-y-1 text-[11px] text-blue-800 dark:text-blue-300">
+                      {ENTITY_EXPLANATIONS[itemType].tips.map((tip, idx) => (
+                        <li key={idx}>{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             {generatedInvite ? (
               /* Invitation Link & Token Generated View */
               <div className="p-6 rounded-2xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 space-y-5 font-sans">
@@ -563,41 +681,98 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                 </div>
               </div>
             ) : !currentPermission.allowed ? (
-              /* RBAC Restriction Alert Card */
-              <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800 space-y-4 font-sans">
+              /* RBAC Restriction & Request Access Flow */
+              <div className="p-5 sm:p-6 rounded-2xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 space-y-5 font-sans">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 shrink-0">
+                  <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 shrink-0">
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-amber-900 dark:text-amber-200">
-                      RBAC Privilege Limitation: Role [{activeRole}] Cannot Create {itemType.toUpperCase()}s
+                    <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                      Access Restricted: Role [{activeRole}]
                     </h3>
-                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 font-mono">
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 font-mono leading-relaxed">
                       {currentPermission.reason}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-amber-200 dark:border-amber-800 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                  <span className="text-amber-800 dark:text-amber-400">Want to test adding this item?</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRole('Admin')}
-                      className="px-3 py-1.5 bg-amber-900 text-white dark:bg-amber-200 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      Switch to Admin Mode
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveRole('Manager')}
-                      className="px-3 py-1.5 bg-amber-800 text-white dark:bg-amber-300 dark:text-amber-950 font-bold rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      Switch to Manager Mode
-                    </button>
+                {accessRequestSent ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Access Request Submitted!</span>
+                    </div>
+                    <p className="text-xs font-mono text-emerald-700 dark:text-emerald-400">
+                      Your request to create <strong>{itemType}</strong> items has been sent to workspace Admins. You will see an update in Notifications when approved.
+                    </p>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-4 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        Request Elevated Privilege
+                      </label>
+                      <p className="text-[11px] text-neutral-500 font-mono mb-2">
+                        Submit a request to workspace Admins to grant you permissions or upgrade your role.
+                      </p>
+                      <textarea
+                        value={accessRequestNote}
+                        onChange={e => setAccessRequestNote(e.target.value)}
+                        placeholder={`Explain why you need access to create ${itemType}s (e.g., "I am leading sprint deliverable X this week")...`}
+                        rows={3}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100 font-sans resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={async () => {
+                          setIsSubmitting(true);
+                          try {
+                            await requestAccess(itemType, accessRequestNote.trim());
+                            setAccessRequestSent(true);
+                          } catch (err: any) {
+                            setSubmitError(err.message || 'Failed to submit access request');
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <span>Request Access from Admin</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               /* Dedicated Form Fields */
@@ -931,6 +1106,56 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                             <p className="text-[11px] text-neutral-500 font-normal leading-snug">{tmpl.desc}</p>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 font-sans">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                          Assign Initial Team Members ({newTeamMemberIds.length} selected)
+                        </label>
+                        <span className="text-[10px] text-neutral-400 font-mono">Lead is automatically assigned</span>
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 bg-neutral-50/50 dark:bg-neutral-900/50">
+                        {users.map(u => {
+                          const isLead = u.id === newTeamLeadId;
+                          const isSelected = isLead || newTeamMemberIds.includes(u.id);
+
+                          return (
+                            <div
+                              key={u.id}
+                              onClick={() => {
+                                if (isLead) return;
+                                if (newTeamMemberIds.includes(u.id)) {
+                                  setNewTeamMemberIds(prev => prev.filter(id => id !== u.id));
+                                } else {
+                                  setNewTeamMemberIds(prev => [...prev, u.id]);
+                                }
+                              }}
+                              className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                isSelected
+                                  ? 'bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700'
+                                  : 'bg-transparent border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                                  isSelected ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white' : 'border-neutral-300 dark:border-neutral-600'
+                                }`}>
+                                  {isSelected && <Check className="w-3 h-3" />}
+                                </div>
+                                <span className="font-medium text-neutral-900 dark:text-neutral-100">{u.name}</span>
+                                {isLead && (
+                                  <span className="text-[8px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-1 py-0.2 rounded">
+                                    LEAD
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-neutral-400 font-mono">{u.role}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>

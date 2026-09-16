@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
 import { SpiderWebCanvas } from './SpiderWebCanvas';
 import { NodeDetailPopupCard } from './NodeDetailPopupCard';
 import { ArrowLeft, Search, Plus, Network } from 'lucide-react';
+import type { EntityType } from '../../types';
 
 export const SpiderWebRelationshipsScreen: React.FC = () => {
-  const { setActiveScreen } = useApp();
+  const navigate = useNavigate();
+  const { setActiveScreen, currentOrgSlug } = useApp();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeType, setSelectedNodeType] = useState<EntityType | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>(['team-eng', 'team-design', 'proj-1', 'proj-2']);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  const handleSelectNode = (id: string) => {
+  const handleSelectNode = (id: string, type?: EntityType) => {
     setSelectedNodeId(id);
+    if (type) setSelectedNodeType(type);
   };
 
   const handleToggleFolder = (folderId: string) => {
@@ -28,7 +33,10 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
       <div className="h-14 px-4 sm:px-6 bg-white/90 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4 shrink-0 z-40 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveScreen('dashboard')}
+            onClick={() => {
+              setActiveScreen('dashboard');
+              navigate(`/${currentOrgSlug || 'epicordia'}/dashboard`);
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-xs font-semibold transition-all text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700/60 shadow-xs"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -97,7 +105,11 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
           {selectedNodeId && (
             <NodeDetailPopupCard
               selectedNodeId={selectedNodeId}
-              onClose={() => setSelectedNodeId(null)}
+              selectedNodeType={selectedNodeType}
+              onClose={() => {
+                setSelectedNodeId(null);
+                setSelectedNodeType(null);
+              }}
             />
           )}
         </div>

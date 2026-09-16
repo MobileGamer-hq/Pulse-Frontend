@@ -3,22 +3,38 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ShieldAlert, CheckCircle2, ArrowRight, LogOut, Building2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
+import { PulseLogo } from '../common/PulseLogo';
+import { WorkspaceGlassLoader } from '../common/WorkspaceGlassLoader';
+import { AnimatePresence } from 'framer-motion';
+
+import { organizationService } from '../../services/organizationService';
+import { authService } from '../../services/authService';
 
 export const WaitingRoomScreen: React.FC = () => {
   const navigate = useNavigate();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
-  const { currentUser, setCurrentOrgSlug, setActiveRole, updateOrgMemberStatus } = useApp();
+  const { currentUser, setCurrentOrgSlug, setActiveRole, updateOrgMemberStatus, userOrgs, isWorkspaceLoading } = useApp();
 
   const activeSlug = (orgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase();
-  const orgDisplayName = activeSlug.charAt(0).toUpperCase() + activeSlug.slice(1);
+  const matchedOrg = (userOrgs || []).find(o => (o.slug || '').toLowerCase() === activeSlug);
+  const orgDisplayName = matchedOrg?.name || (
+    activeSlug
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+  );
 
   const [loading, setLoading] = useState(false);
   const [approved, setApproved] = useState(false);
   const [assignedRole, setAssignedRole] = useState<string | null>(null);
 
-  const handleSimulateApproval = (selectedRole: string = 'Member') => {
+  const handleSimulateApproval = async (selectedRole: string = 'Member') => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (currentUser?.id) {
+        await organizationService.approveMember(activeSlug, currentUser.id, selectedRole).catch(() => null);
+      }
+    } finally {
       setLoading(false);
       setApproved(true);
       setAssignedRole(selectedRole);
@@ -30,7 +46,7 @@ export const WaitingRoomScreen: React.FC = () => {
         localStorage.setItem(`pulse_org_status_${activeSlug}`, 'APPROVED');
         localStorage.setItem(`pulse_user_role_${activeSlug}`, selectedRole);
       }
-    }, 800);
+    }
   };
 
   const handleEnterWorkspace = () => {
@@ -44,9 +60,7 @@ export const WaitingRoomScreen: React.FC = () => {
       {/* Top Header */}
       <div className="max-w-4xl w-full mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold flex items-center justify-center text-xs tracking-tighter shadow-sm">
-            ◇
-          </div>
+          <PulseLogo size="md" className="shadow-xs" />
           <div>
             <div className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 tracking-tight">Pulse</div>
             <div className="text-[10px] text-neutral-500 font-mono">by Epicordia</div>
@@ -129,11 +143,7 @@ export const WaitingRoomScreen: React.FC = () => {
                   <span>Switch Workspace</span>
                 </button>
                 <button
-                  onClick={() => {
-                    localStorage.removeItem('pulse_auth_token');
-                    localStorage.removeItem('pulse_tenant_slug');
-                    navigate('/welcome');
-                  }}
+                  onClick={() => authService.signOut()}
                   className="py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-mono text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
@@ -173,6 +183,16 @@ export const WaitingRoomScreen: React.FC = () => {
       <div className="max-w-4xl w-full mx-auto text-center text-[10px] font-mono text-neutral-400 py-4 border-t border-neutral-200/60 dark:border-neutral-800/60">
         <span>Pulse by Epicordia • Role-Governed Alignment System</span>
       </div>
+
+      {/* Floating Glass Background Blur Loading Overlay */}
+      <AnimatePresence>
+        {isWorkspaceLoading && (
+          <WorkspaceGlassLoader 
+            message={`Loading ${orgDisplayName}`}
+            subMessage="Verifying workspace permissions and role clearance..."
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

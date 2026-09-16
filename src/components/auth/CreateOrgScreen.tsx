@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Code, Compass, TrendingUp, LayoutGrid, Users, Check, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { PulseLogo } from '../common/PulseLogo';
+import { organizationService } from '../../services/organizationService';
 import type { WorkflowTemplate } from '../../types';
 
 export const CreateOrgScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, addOrg, addTeam, setCurrentOrgSlug } = useApp();
+  const { currentUser, addOrg, addTeam } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const [orgName, setOrgName] = useState('');
@@ -19,22 +21,38 @@ export const CreateOrgScreen: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [validatingSlug, setValidatingSlug] = useState(false);
 
-  const handleStep1Next = (e: React.FormEvent) => {
+  const handleStep1Next = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!orgName.trim()) {
       setError('Please enter your organization name.');
       return;
     }
-    const slug = orgSlug.trim() ? orgSlug.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slug = orgSlug.trim() ? orgSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') : orgName.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (!slug) {
-      setError('Please enter a valid subdomain / slug.');
+      setError('Please enter a valid workspace slug.');
       return;
     }
-    setOrgSlug(slug);
-    setStep(2);
+
+    setValidatingSlug(true);
+    try {
+      const check = await organizationService.checkSlugAvailable(slug);
+      if (!check.available) {
+        setError(check.reason || `The workspace slug "${slug}" is already taken. Please choose another.`);
+        setValidatingSlug(false);
+        return;
+      }
+      setOrgSlug(slug);
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message || 'Error checking workspace slug.');
+    } finally {
+      setValidatingSlug(false);
+    }
   };
+
 
   const handleStep2Next = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,52 +68,37 @@ export const CreateOrgScreen: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    const slug = orgSlug || orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'epicordia';
+    const slug = orgSlug || orgName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
     try {
-      const newOrg = {
-        id: `org-${Date.now()}`,
-        name: orgName,
+      // 1. Create Organization in Supabase
+      await addOrg({
+        name: orgName.trim(),
         slug: slug,
-        role: 'Admin' as const,
-        status: 'APPROVED' as const,
-        membersCount: 1,
-        activeProjects: 1
-      };
+        industry: industry,
+        companySize: companySize,
+      });
 
-      // Set active workspace context
-      if (setCurrentOrgSlug) {
-        setCurrentOrgSlug(slug);
+      // 2. Create Initial Primary Team
+      if (teamName.trim()) {
+        try {
+          await addTeam({
+            name: teamName.trim(),
+            leadId: currentUser.id,
+            leadName: currentUser.name,
+            memberIds: [currentUser.id],
+            workflowTemplate: selectedTemplate || 'SoftwareSprint',
+          }, slug);
+        } catch (teamErr) {
+          console.warn('[CreateOrgScreen] Primary team creation warning:', teamErr);
+        }
       }
-
-      // 1. Create Organization in Backend & Context
-      if (addOrg) {
-        await addOrg(newOrg);
-      } else {
-        const storedOrgs = JSON.parse(localStorage.getItem('pulse_user_orgs') || '[]');
-        localStorage.setItem('pulse_user_orgs', JSON.stringify([...storedOrgs, newOrg]));
-      }
-
-      // 2. Create Initial Primary Team (e.g. Core Team) with Workflow Template and explicit slug
-      if (addTeam) {
-        await addTeam({
-          name: teamName || 'Core Team',
-          leadId: currentUser.id,
-          leadName: currentUser.name,
-          memberIds: [currentUser.id],
-          workflowTemplate: selectedTemplate || 'SoftwareSprint',
-        }, slug);
-      }
-
-      localStorage.setItem('pulse_is_new_user', 'false');
-      localStorage.setItem('pulse_tenant_slug', slug);
-      localStorage.setItem(`pulse_org_status_${slug}`, 'APPROVED');
-      localStorage.setItem(`pulse_user_role_${slug}`, 'Admin');
 
       setLoading(false);
       navigate(`/${slug}/dashboard`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create organization.');
+      console.error('[CreateOrgScreen] Organization creation error:', err);
+      setError(err.message || 'Failed to create organization in database.');
       setLoading(false);
     }
   };
@@ -139,9 +142,7 @@ export const CreateOrgScreen: React.FC = () => {
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs shadow-xs">
-            ◇
-          </div>
+          <PulseLogo size="sm" />
           <div>
             <span className="font-bold text-lg tracking-tight block leading-tight">Pulse</span>
             <span className="text-[10px] text-neutral-400 font-mono block">by Epicordia</span>
@@ -202,7 +203,7 @@ export const CreateOrgScreen: React.FC = () => {
           <div>
             <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 1 of 3</span>
             <h2 className="text-xl font-bold tracking-tight">Organization Registration</h2>
-            <p className="text-xs text-neutral-500 mt-1">Configure your company identity and workspace slug.</p>
+            <p className="text-xs text-neutral-500 mt-1">Configure your company identity and workspace URL route.</p>
           </div>
 
           <div className="space-y-4 text-xs">
@@ -229,19 +230,24 @@ export const CreateOrgScreen: React.FC = () => {
 
             <div>
               <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1.5 uppercase">
-                Workspace Subdomain (Slug) <span className="text-red-500">*</span>
+                Workspace URL Route (Slug) <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 overflow-hidden focus-within:border-neutral-900 dark:focus-within:border-white transition-colors">
+                <span className="pl-3.5 pr-0.5 font-mono text-neutral-400 text-xs select-none">
+                  pulse.epicordia.com/
+                </span>
                 <input
                   type="text"
                   required
                   value={orgSlug}
-                  onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                  onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="epicordia"
-                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+                  className="flex-1 py-2.5 pr-3.5 pl-0.5 bg-transparent text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
                 />
-                <span className="font-mono text-neutral-400 text-xs">.pulse.app</span>
               </div>
+              <span className="text-[10px] text-neutral-400 font-mono mt-1 block">
+                Members will access this workspace at pulse.epicordia.com/{orgSlug || 'workspace-slug'}
+              </span>
             </div>
 
             <div>
@@ -286,12 +292,23 @@ export const CreateOrgScreen: React.FC = () => {
           <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-end">
             <button
               type="submit"
-              className="py-3 px-6 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm"
+              disabled={validatingSlug}
+              className="py-3 px-6 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-60"
             >
-              <span>Continue to Team Setup</span>
-              <ArrowRight className="w-4 h-4" />
+              {validatingSlug ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Checking Availability...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue to Team Setup</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </div>
+
         </form>
       )}
 
@@ -384,9 +401,7 @@ export const CreateOrgScreen: React.FC = () => {
       {/* Step 3: Launch */}
       {step === 3 && (
         <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-8 shadow-sm space-y-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
-            ◇
-          </div>
+          <PulseLogo size="xl" className="mx-auto shadow-md" />
           <div>
             <span className="text-[11px] font-mono text-neutral-400 block mb-1">Step 3 of 3</span>
             <h2 className="text-2xl font-black tracking-tight">Launch Organization Workspace</h2>
@@ -394,7 +409,7 @@ export const CreateOrgScreen: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 text-left text-xs font-mono space-y-2 border border-neutral-200 dark:border-neutral-700">
-            <div>• Organization: <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgName} ({orgSlug}.pulse.app)</span></div>
+            <div>• Organization: <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgName} (pulse.epicordia.com/{orgSlug})</span></div>
             <div>• Initial Role: <span className="font-bold text-emerald-600 dark:text-emerald-400">Admin (Owner)</span></div>
             <div>• Industry &amp; Size: <span className="font-bold text-neutral-900 dark:text-neutral-100">{industry} • {companySize}</span></div>
             <div>• Initial Team: <span className="font-bold text-neutral-900 dark:text-neutral-100">{teamName}</span></div>

@@ -3,7 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { 
   AlertTriangle, UserCheck, AtSign, FileText, 
-  Check, ArrowLeft, FolderKanban, MessageSquare, ExternalLink, Network, Bell, CheckCheck
+  Check, ArrowLeft, FolderKanban, MessageSquare, ExternalLink, Network, Bell, CheckCheck,
+  RotateCw, KeyRound, ShieldCheck, ShieldX, CheckCircle2, UserPlus
 } from 'lucide-react';
 
 export const NotificationsScreen: React.FC = () => {
@@ -13,19 +14,32 @@ export const NotificationsScreen: React.FC = () => {
     projects, 
     eodEntries, 
     currentUser, 
+    activeRole,
     pushPanel, 
     updateTask,
     markNotificationAsRead, 
-    markAllNotificationsAsRead 
+    markAllNotificationsAsRead,
+    refreshWorkspaceData,
+    approveAccessRequest,
+    dismissAccessRequest
   } = useApp();
 
   const [viewState, setViewState] = useState<'center' | 'blocker_detail'>('center');
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'UNREAD' | 'ASSIGNMENTS' | 'BLOCKERS' | 'MENTIONS'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'UNREAD' | 'REQUESTS' | 'ASSIGNMENTS' | 'BLOCKERS' | 'MENTIONS'>('ALL');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-
-  // Comment state for blocker detail
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [activityLogs, setActivityLogs] = useState<{ id: string; user: string; time: string; text: string }[]>([]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshWorkspaceData(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   // Format relative timestamp
   const formatTime = (dateStr?: string) => {
@@ -48,8 +62,8 @@ export const NotificationsScreen: React.FC = () => {
   // Build unified list of real items from database
   interface UnifiedItem {
     id: string;
-    itemType: 'DB_NOTIFICATION' | 'TASK_BLOCKER' | 'EOD_BLOCKER' | 'TASK_ASSIGNMENT';
-    category: 'BLOCKERS' | 'ASSIGNMENTS' | 'MENTIONS' | 'SYSTEM' | 'REPORTS';
+    itemType: 'DB_NOTIFICATION' | 'TASK_BLOCKER' | 'EOD_BLOCKER' | 'TASK_ASSIGNMENT' | 'ACCESS_REQUEST';
+    category: 'BLOCKERS' | 'ASSIGNMENTS' | 'MENTIONS' | 'SYSTEM' | 'REPORTS' | 'REQUESTS';
     title: string;
     subtitle?: string;
     tag?: string;
@@ -67,14 +81,24 @@ export const NotificationsScreen: React.FC = () => {
   // 1. Real Notifications from DB
   (notifications || []).forEach(n => {
     let cat: UnifiedItem['category'] = 'SYSTEM';
-    if (n.type === 'blocker_flagged') cat = 'BLOCKERS';
-    else if (n.type === 'task_assignment') cat = 'ASSIGNMENTS';
-    else if (n.type === 'mention') cat = 'MENTIONS';
-    else if (n.type === 'report_ready') cat = 'REPORTS';
+    let itemType: UnifiedItem['itemType'] = 'DB_NOTIFICATION';
+
+    if (n.type === 'access_request') {
+      cat = 'REQUESTS';
+      itemType = 'ACCESS_REQUEST';
+    } else if (n.type === 'blocker_flagged') {
+      cat = 'BLOCKERS';
+    } else if (n.type === 'task_assignment') {
+      cat = 'ASSIGNMENTS';
+    } else if (n.type === 'mention') {
+      cat = 'MENTIONS';
+    } else if (n.type === 'report_ready') {
+      cat = 'REPORTS';
+    }
 
     unifiedItems.push({
       id: `notif-${n.id}`,
-      itemType: 'DB_NOTIFICATION',
+      itemType,
       category: cat,
       title: n.title,
       subtitle: n.body,
@@ -107,8 +131,14 @@ export const NotificationsScreen: React.FC = () => {
     });
 
   // 3. Real Flagged EOD Submissions with blockers
+  const isMeaningfulBlocker = (text?: string): boolean => {
+    if (!text) return false;
+    const t = text.trim().toLowerCase();
+    return t !== '' && t !== 'none' && t !== 'no' && t !== 'nil' && t !== 'n/a' && t !== 'no blockers' && t !== 'none.';
+  };
+
   eodEntries
-    .filter(e => e.flaggedToManager || (e.blockers && e.blockers.trim().length > 0))
+    .filter(e => isMeaningfulBlocker(e.blockers))
     .forEach(e => {
       unifiedItems.push({
         id: `eod-${e.id}`,
@@ -147,6 +177,7 @@ export const NotificationsScreen: React.FC = () => {
   // Filter items
   const filteredItems = unifiedItems.filter(item => {
     if (activeFilter === 'UNREAD') return item.unread;
+    if (activeFilter === 'REQUESTS') return item.category === 'REQUESTS';
     if (activeFilter === 'ASSIGNMENTS') return item.category === 'ASSIGNMENTS';
     if (activeFilter === 'BLOCKERS') return item.category === 'BLOCKERS';
     if (activeFilter === 'MENTIONS') return item.category === 'MENTIONS';
@@ -172,10 +203,12 @@ export const NotificationsScreen: React.FC = () => {
         assigneeIds: [currentUser.id],
         status: 'InProgress'
       });
-      alert(`Task "${currentSelected.rawTask.title}" has been assigned to you and set to In Progress.`);
+      setActionSuccessMsg(`Task "${currentSelected.rawTask.title}" has been assigned to you and set to In Progress.`);
+      setTimeout(() => setActionSuccessMsg(null), 3000);
     } else if (currentSelected?.rawNotif) {
       markNotificationAsRead(currentSelected.rawNotif.id);
-      alert('Alert acknowledged and marked as read.');
+      setActionSuccessMsg('Alert acknowledged and marked as read.');
+      setTimeout(() => setActionSuccessMsg(null), 3000);
     }
   };
 
@@ -187,29 +220,40 @@ export const NotificationsScreen: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Notifications</h1>
-              <p className="text-xs text-neutral-500 font-mono mt-0.5">Manage and triage system alerts from your live database.</p>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Manage, triage, and grant access requests from live database notifications.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 font-mono">
               {/* Filter Pills */}
               <div className="flex items-center gap-1">
-                {(['ALL', 'UNREAD', 'ASSIGNMENTS', 'BLOCKERS', 'MENTIONS'] as const).map(f => (
+                {(['ALL', 'UNREAD', 'REQUESTS', 'ASSIGNMENTS', 'BLOCKERS', 'MENTIONS'] as const).map(f => (
                   <button
                     key={f}
                     onClick={() => {
                       setActiveFilter(f);
                       setSelectedItemId(null);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeFilter === f 
                         ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs' 
-                        : 'border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100'
+                        : 'border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
                     }`}
                   >
                     {f}
                   </button>
                 ))}
               </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Sync notifications with live database"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
 
               {/* Mark All Read Button */}
               {unifiedItems.some(i => i.unread) && (
@@ -224,6 +268,13 @@ export const NotificationsScreen: React.FC = () => {
             </div>
           </div>
 
+          {actionSuccessMsg && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{actionSuccessMsg}</span>
+            </div>
+          )}
+
           {/* Main Grid: Left Notification List + Right Detail Card */}
           {filteredItems.length === 0 ? (
             <div className="p-12 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-center space-y-3 shadow-xs">
@@ -232,7 +283,7 @@ export const NotificationsScreen: React.FC = () => {
               </div>
               <div className="font-bold text-sm text-neutral-900 dark:text-neutral-100">All Caught Up!</div>
               <p className="text-xs text-neutral-500 max-w-sm mx-auto font-mono">
-                No active notifications or blockers found under the <span className="font-bold">{activeFilter}</span> filter. New assignments and blocker flags will appear here in real time.
+                No active notifications or blockers found under the <span className="font-bold">{activeFilter}</span> filter. New assignments, access requests, and blocker flags will appear here in real time.
               </p>
             </div>
           ) : (
@@ -258,6 +309,11 @@ export const NotificationsScreen: React.FC = () => {
                     >
                       <div className="flex justify-between items-center text-[10px]">
                         <div className="flex items-center gap-1.5">
+                          {item.category === 'REQUESTS' && (
+                            <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <KeyRound className="w-3 h-3" /> ACCESS REQUEST
+                            </span>
+                          )}
                           {item.category === 'BLOCKERS' && (
                             <span className="font-bold text-red-600 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" /> CRITICAL BLOCKER
@@ -279,7 +335,7 @@ export const NotificationsScreen: React.FC = () => {
                             </span>
                           )}
                           {item.category === 'SYSTEM' && (
-                            <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                               <Bell className="w-3 h-3" /> SYSTEM ALERT
                             </span>
                           )}
@@ -320,8 +376,16 @@ export const NotificationsScreen: React.FC = () => {
                     {/* Header */}
                     <div className="flex justify-between items-start pb-3 border-b border-neutral-100 dark:border-neutral-800 font-mono">
                       <div className="space-y-1">
-                        <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1">
-                          {currentSelected.category === 'BLOCKERS' ? <AlertTriangle className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                        <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                          currentSelected.category === 'BLOCKERS' ? 'text-red-600' : currentSelected.category === 'REQUESTS' ? 'text-amber-600' : 'text-blue-600'
+                        }`}>
+                          {currentSelected.category === 'BLOCKERS' ? (
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          ) : currentSelected.category === 'REQUESTS' ? (
+                            <KeyRound className="w-3.5 h-3.5" />
+                          ) : (
+                            <Bell className="w-3.5 h-3.5" />
+                          )}
                           {currentSelected.category}
                         </div>
                         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 font-sans tracking-tight">
@@ -333,57 +397,141 @@ export const NotificationsScreen: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Description Box */}
-                    <div className="space-y-1.5 font-mono">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Description &amp; Details</span>
-                      <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 font-mono text-[11px] leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap">
-                        {currentSelected.subtitle || 'No additional description provided.'}
-                      </div>
-                    </div>
+                    {/* Access Request Specific Card */}
+                    {currentSelected.itemType === 'ACCESS_REQUEST' ? (
+                      <div className="space-y-4 font-sans">
+                        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar name={currentSelected.senderName || 'Requester'} size="sm" />
+                            <div>
+                              <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+                                {currentSelected.senderName || 'Teammate'}
+                              </div>
+                              <div className="text-[11px] text-neutral-500 font-mono">
+                                Requesting elevated creation permissions in this workspace.
+                              </div>
+                            </div>
+                          </div>
 
-                    {/* Impacted Entities */}
-                    <div className="space-y-1.5 font-mono">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Context / Workspace Entity</span>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {currentSelected.tag && (
-                          <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
-                            <FolderKanban className="w-3 h-3 text-neutral-400" /> {currentSelected.tag}
-                          </span>
-                        )}
-                        {currentSelected.rawTask && (
-                          <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
-                            <FileText className="w-3 h-3 text-neutral-400" /> Priority: {currentSelected.rawTask.priority}
-                          </span>
+                          <div className="p-3 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-800 dark:text-neutral-200 font-mono leading-relaxed">
+                            {currentSelected.subtitle || 'No request notes provided.'}
+                          </div>
+                        </div>
+
+                        {/* Admin Action Bar */}
+                        {['Admin', 'Manager', 'Executive'].includes(activeRole) ? (
+                          <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                            <span className="text-[11px] font-mono font-bold text-neutral-500 uppercase tracking-wider block">
+                              Administrator Actions:
+                            </span>
+                            <div className="flex flex-wrap items-center gap-2 font-mono">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const requesterId = currentSelected.rawNotif?.sender?.id || currentSelected.rawNotif?.metadata?.requesterId;
+                                  if (requesterId) {
+                                    await approveAccessRequest(currentSelected.rawNotif.id, requesterId, 'Manager');
+                                    setActionSuccessMsg(`Granted Manager access to ${currentSelected.senderName}`);
+                                    setTimeout(() => setActionSuccessMsg(null), 3000);
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                Approve & Grant Manager Role
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const requesterId = currentSelected.rawNotif?.sender?.id || currentSelected.rawNotif?.metadata?.requesterId;
+                                  if (requesterId) {
+                                    await approveAccessRequest(currentSelected.rawNotif.id, requesterId, 'Admin');
+                                    setActionSuccessMsg(`Granted Admin access to ${currentSelected.senderName}`);
+                                    setTimeout(() => setActionSuccessMsg(null), 3000);
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold text-xs hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Approve & Grant Admin Role
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await dismissAccessRequest(currentSelected.rawNotif.id);
+                                  setActionSuccessMsg('Access request declined.');
+                                  setTimeout(() => setActionSuccessMsg(null), 3000);
+                                }}
+                                className="px-4 py-2 rounded-xl border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 font-bold text-xs hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <ShieldX className="w-3.5 h-3.5" />
+                                Decline
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 text-xs font-mono">
+                            Pending review by workspace Administrators.
+                          </div>
                         )}
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Description Box */}
+                        <div className="space-y-1.5 font-mono">
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Description &amp; Details</span>
+                          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 font-mono text-[11px] leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap">
+                            {currentSelected.subtitle || 'No additional description provided.'}
+                          </div>
+                        </div>
+
+                        {/* Impacted Entities */}
+                        <div className="space-y-1.5 font-mono">
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Context / Workspace Entity</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {currentSelected.tag && (
+                              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
+                                <FolderKanban className="w-3 h-3 text-neutral-400" /> {currentSelected.tag}
+                              </span>
+                            )}
+                            {currentSelected.rawTask && (
+                              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
+                                <FileText className="w-3 h-3 text-neutral-400" /> Priority: {currentSelected.rawTask.priority}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Bottom Action Buttons */}
-                  <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-end gap-3 font-mono">
-                    <button
-                      onClick={handleAcknowledgeAndAssign}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                    >
-                      Acknowledge &amp; Assign to Self
-                    </button>
-                    {currentSelected.rawTask && (
+                  {/* Bottom Action Buttons (Non-access request) */}
+                  {currentSelected.itemType !== 'ACCESS_REQUEST' && (
+                    <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-end gap-3 font-mono">
                       <button
-                        onClick={() => pushPanel({ type: 'task', id: currentSelected.rawTask.id })}
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                        onClick={handleAcknowledgeAndAssign}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
                       >
-                        View Ticket in Context
+                        Acknowledge &amp; Assign to Self
                       </button>
-                    )}
-                    {currentSelected.category === 'BLOCKERS' && (
-                      <button
-                        onClick={() => setViewState('blocker_detail')}
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                      >
-                        Blocker Resolution Center
-                      </button>
-                    )}
-                  </div>
+                      {currentSelected.rawTask && (
+                        <button
+                          onClick={() => pushPanel({ type: 'task', id: currentSelected.rawTask.id })}
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                        >
+                          View Ticket in Context
+                        </button>
+                      )}
+                      {currentSelected.category === 'BLOCKERS' && (
+                        <button
+                          onClick={() => setViewState('blocker_detail')}
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                        >
+                          Blocker Resolution Center
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

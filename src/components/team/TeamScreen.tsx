@@ -1,20 +1,44 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
-import { Search, UserPlus, Eye, Users, Layers, Plus, Edit3, Trash2, X, Check } from 'lucide-react';
-import type { Team, WorkflowTemplate } from '../../types';
+import { 
+  Search, UserPlus, Eye, Users, Layers, Plus, Edit3, Trash2, X, Check, 
+  UserMinus, UserX, RotateCw, AlertTriangle
+} from 'lucide-react';
+import type { Team, WorkflowTemplate, User } from '../../types';
 
 export const TeamScreen: React.FC = () => {
-  const { users, teams, updateTeam, deleteTeam, pushPanel } = useApp();
+  const { users, teams, updateTeam, deleteTeam, removeMemberFromTeam, removeMemberFromOrg, pushPanel, refreshWorkspaceData, currentOrgName } = useApp();
   const [selectedTeamId, setSelectedTeamId] = useState<string | 'all'>('all');
   const [memberQuery, setMemberQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Modal State for Removing Member from Organization
+  const [orgUserToRemove, setOrgUserToRemove] = useState<User | null>(null);
 
   // Modal State for Editing Team Info
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [editName, setEditName] = useState('');
   const [editTemplate, setEditTemplate] = useState<WorkflowTemplate>('SoftwareSprint');
   const [editLeadId, setEditLeadId] = useState('');
+  const [editMemberIds, setEditMemberIds] = useState<string[]>([]);
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+
+  // Modal State for Dedicated "Manage Team Members"
+  const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
+  const [manageSearchQuery, setManageSearchQuery] = useState('');
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [managingTeam, setManagingTeam] = useState<Team | null>(null);
+
+  // Quick Assign User to Team Modal (when on 'all' view)
+  const [assigningUser, setAssigningUser] = useState<User | null>(null);
+  const [targetTeamId, setTargetTeamId] = useState<string>('');
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshWorkspaceData(false);
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   // Active selected team object (if not 'all')
   const selectedTeam = selectedTeamId !== 'all' ? teams.find(t => t.id === selectedTeamId) : null;
@@ -23,7 +47,11 @@ export const TeamScreen: React.FC = () => {
   const teamMembers = users.filter(u => {
     if (selectedTeamId === 'all') return true;
     if (!selectedTeam) return false;
-    return (selectedTeam.memberIds || []).includes(u.id) || u.teamId === selectedTeam.id || selectedTeam.leadId === u.id;
+    return (
+      (selectedTeam.memberIds || []).includes(u.id) ||
+      u.teamId === selectedTeam.id ||
+      (selectedTeam.leadId && selectedTeam.leadId === u.id)
+    );
   });
 
   const filteredMembers = teamMembers.filter(u => 
@@ -38,6 +66,12 @@ export const TeamScreen: React.FC = () => {
     setEditName(team.name);
     setEditTemplate((team.workflowTemplate as WorkflowTemplate) || 'SoftwareSprint');
     setEditLeadId(team.leadId || '');
+    
+    // Compute current members for this team
+    const currentMemberIds = users
+      .filter(u => (team.memberIds || []).includes(u.id) || u.teamId === team.id || (team.leadId && team.leadId === u.id))
+      .map(u => u.id);
+    setEditMemberIds(Array.from(new Set(currentMemberIds.length > 0 ? currentMemberIds : (team.leadId ? [team.leadId] : []))));
   };
 
   const handleSaveTeamEdit = (e: React.FormEvent) => {
@@ -45,15 +79,88 @@ export const TeamScreen: React.FC = () => {
     if (!editingTeam || !editName.trim()) return;
 
     const leadUser = users.find(u => u.id === editLeadId);
+    const finalMemberIds = Array.from(new Set(editLeadId ? [editLeadId, ...editMemberIds] : editMemberIds));
 
     updateTeam(editingTeam.id, {
       name: editName.trim(),
       workflowTemplate: editTemplate,
       leadId: editLeadId,
       leadName: leadUser?.name || editingTeam.leadName,
+      memberIds: finalMemberIds,
     });
 
     setEditingTeam(null);
+  };
+
+  const handleOpenManageMembers = (team: Team) => {
+    setManagingTeam(team);
+    const currentMemberIds = users
+      .filter(u => (team.memberIds || []).includes(u.id) || u.teamId === team.id || (team.leadId && team.leadId === u.id))
+      .map(u => u.id);
+    setSelectedMemberIds(Array.from(new Set(currentMemberIds.length > 0 ? currentMemberIds : (team.leadId ? [team.leadId] : []))));
+    setManageSearchQuery('');
+    setIsManageMembersOpen(true);
+  };
+
+  const handleSaveManageMembers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!managingTeam) return;
+
+    const finalMemberIds = Array.from(new Set(managingTeam.leadId ? [managingTeam.leadId, ...selectedMemberIds] : selectedMemberIds));
+    await updateTeam(managingTeam.id, {
+      memberIds: finalMemberIds
+    });
+
+    setIsManageMembersOpen(false);
+    setManagingTeam(null);
+  };
+
+  const handleRemoveMemberFromCurrentTeam = async (userToRemove: User) => {
+    if (!selectedTeam) return;
+    if (selectedTeam.leadId === userToRemove.id) {
+      alert(`${userToRemove.name} is the Team Lead. To remove them, please assign a new Team Lead first in Edit Team Info.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to remove ${userToRemove.name} from team "${selectedTeam.name}"?`)) {
+      await removeMemberFromTeam(selectedTeam.id, userToRemove.id);
+    }
+  };
+
+  const handleRemoveMemberFromSpecificTeam = async (teamId: string, userToRemove: User) => {
+    const target = teams.find(t => t.id === teamId);
+    const tName = target ? target.name : 'this team';
+    if (window.confirm(`Are you sure you want to remove ${userToRemove.name} from team "${tName}"?`)) {
+      await removeMemberFromTeam(teamId, userToRemove.id);
+    }
+  };
+
+  const handleConfirmRemoveFromOrg = async () => {
+    if (!orgUserToRemove) return;
+    await removeMemberFromOrg(orgUserToRemove.id);
+    setOrgUserToRemove(null);
+  };
+
+  const handleSaveAssignUserToTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assigningUser || !targetTeamId) return;
+
+    const targetTeam = teams.find(t => t.id === targetTeamId);
+    if (!targetTeam) return;
+
+    const currentMemberIds = users
+      .filter(u => (targetTeam.memberIds || []).includes(u.id) || u.teamId === targetTeam.id || (targetTeam.leadId && targetTeam.leadId === u.id))
+      .map(u => u.id);
+    
+    if (!currentMemberIds.includes(assigningUser.id)) {
+      const newMemberIds = [...currentMemberIds, assigningUser.id];
+      await updateTeam(targetTeam.id, {
+        memberIds: newMemberIds
+      });
+    }
+
+    setAssigningUser(null);
+    setTargetTeamId('');
   };
 
   const handleDeleteTeamConfirm = (teamId: string) => {
@@ -65,10 +172,12 @@ export const TeamScreen: React.FC = () => {
   };
 
   const WORKFLOW_TEMPLATES: { id: WorkflowTemplate; label: string }[] = [
-    { id: 'SoftwareSprint', label: 'Software Development' },
-    { id: 'BugTracking', label: 'Bug Tracking & Issues' },
-    { id: 'MarketingCampaign', label: 'Marketing Campaign' },
-    { id: 'ClientOnboarding', label: 'Agency & Client Work' },
+    { id: 'SoftwareSprint', label: 'Software Sprint (Agile)' },
+    { id: 'KanbanFlow', label: 'Kanban Continuous Flow' },
+    { id: 'MarketingLaunch', label: 'Marketing Campaign Launch' },
+    { id: 'SalesPipeline', label: 'Sales & Revenue Pipeline' },
+    { id: 'DesignSystem', label: 'Design System Iteration' },
+    { id: 'ExecutiveStrategy', label: 'Executive Strategy & OKRs' },
     { id: 'GeneralOps', label: 'General Operations' },
   ];
 
@@ -79,11 +188,21 @@ export const TeamScreen: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Teams &amp; Organization Roster</h1>
           <p className="text-xs text-neutral-500 font-mono mt-0.5">
-            Select a team to inspect its members, edit team settings, and manage workflow templates.
+            Select a team to inspect its members, assign organization members, and manage workflow templates.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-3.5 py-2 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-60"
+            title="Sync latest roster and teams from database"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'team' } }))}
             className="px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -109,7 +228,7 @@ export const TeamScreen: React.FC = () => {
             Organization Teams ({teams.length})
           </span>
           <span className="text-[10px] font-mono text-neutral-500">
-            Click a team card to inspect members or edit team info
+            Click a team card to inspect members or manage team assignments
           </span>
         </div>
 
@@ -145,7 +264,12 @@ export const TeamScreen: React.FC = () => {
           {/* Individual Team Cards */}
           {teams.map(t => {
             const isSelected = selectedTeamId === t.id;
-            const mCount = (t.memberIds || []).length || users.filter(u => u.teamId === t.id).length || 1;
+            const teamUsers = users.filter(u => 
+              (t.memberIds || []).includes(u.id) || 
+              u.teamId === t.id || 
+              (t.leadId && t.leadId === u.id)
+            );
+            const mCount = teamUsers.length;
 
             return (
               <div
@@ -172,7 +296,7 @@ export const TeamScreen: React.FC = () => {
                         ? 'bg-white/20 dark:bg-black/20 text-white dark:text-black'
                         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
                     }`}>
-                      {mCount} members
+                      {mCount} {mCount === 1 ? 'member' : 'members'}
                     </span>
 
                     <button
@@ -231,15 +355,23 @@ export const TeamScreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             {selectedTeam && (
               <>
+                <button
+                  onClick={() => handleOpenManageMembers(selectedTeam)}
+                  className="px-3.5 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  + Add / Manage Members
+                </button>
+
                 <button
                   onClick={() => handleStartEditTeam(selectedTeam)}
                   className="px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  Edit Team Info
+                  Edit Settings
                 </button>
 
                 <button
@@ -270,15 +402,27 @@ export const TeamScreen: React.FC = () => {
             <span className="text-[11px] text-neutral-500 font-mono">Showing {filteredMembers.length} team members</span>
           </div>
           
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={memberQuery}
-              onChange={e => setMemberQuery(e.target.value)}
-              placeholder="Filter member by name, role..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={memberQuery}
+                onChange={e => setMemberQuery(e.target.value)}
+                placeholder="Filter member by name, role..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+              />
+            </div>
+
+            {selectedTeam && (
+              <button
+                onClick={() => handleOpenManageMembers(selectedTeam)}
+                className="px-3 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add Members</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -288,6 +432,7 @@ export const TeamScreen: React.FC = () => {
               <tr>
                 <th className="pb-2">Member</th>
                 <th className="pb-2">Title &amp; Role</th>
+                <th className="pb-2">Team Affiliation</th>
                 <th className="pb-2">Weekly Capacity</th>
                 <th className="pb-2 text-right">Actions</th>
               </tr>
@@ -295,66 +440,465 @@ export const TeamScreen: React.FC = () => {
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-10 text-center space-y-3">
+                  <td colSpan={5} className="py-10 text-center space-y-3">
                     <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
                       <Users className="w-5 h-5" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No members found in this team</p>
-                      <p className="text-[11px] text-neutral-500 font-mono">Invite or assign team members to populate this roster.</p>
+                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                        {selectedTeam ? `No members currently assigned to ${selectedTeam.name}` : 'No members found'}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 font-mono">
+                        {selectedTeam 
+                          ? 'Add existing organization members or invite new members to this team.' 
+                          : 'Invite members to build your organization roster.'}
+                      </p>
                     </div>
+
+                    {selectedTeam ? (
+                      <button
+                        onClick={() => handleOpenManageMembers(selectedTeam)}
+                        className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        + Add Members to {selectedTeam.name}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'member' } }))}
+                        className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Invite Workspace Member
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
-                filteredMembers.map(m => (
-                  <tr key={m.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors">
-                    <td className="py-3 font-semibold text-neutral-900 dark:text-neutral-100">
-                      <div 
-                        className="flex items-center gap-2.5 cursor-pointer"
-                        onClick={() => pushPanel({ type: 'person', id: m.id })}
-                      >
-                        <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
-                        <div>
-                          <div className="font-bold text-xs">{m.name}</div>
-                          <div className="text-[10px] text-neutral-400 font-normal">{m.email}</div>
-                        </div>
-                      </div>
-                    </td>
+                filteredMembers.map(m => {
+                  const memberTeams = teams.filter(t => 
+                    (t.memberIds || []).includes(m.id) || 
+                    m.teamId === t.id || 
+                    (t.leadId && t.leadId === m.id)
+                  );
 
-                    <td className="py-3 text-neutral-500 font-sans">
-                      <div className="font-semibold text-neutral-900 dark:text-neutral-100">{m.title}</div>
-                      <div className="text-[10px] text-neutral-400 font-mono">Role: {m.role}</div>
-                    </td>
+                  const isLeadOfSelected = selectedTeam && selectedTeam.leadId === m.id;
 
-                    <td className="py-3">
-                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                        {m.capacityHoursPerWeek || 40} hrs / wk
-                      </span>
-                    </td>
-
-                    <td className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
+                  return (
+                    <tr key={m.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors">
+                      <td className="py-3 font-semibold text-neutral-900 dark:text-neutral-100">
+                        <div 
+                          className="flex items-center gap-2.5 cursor-pointer"
                           onClick={() => pushPanel({ type: 'person', id: m.id })}
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                          title="View Profile Details"
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
+                          <div>
+                            <div className="font-bold text-xs flex items-center gap-1.5">
+                              <span>{m.name}</span>
+                              {isLeadOfSelected && (
+                                <span className="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                  TEAM LEAD
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-neutral-400 font-normal">{m.email}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3 text-neutral-500 font-sans">
+                        <div className="font-semibold text-neutral-900 dark:text-neutral-100">{m.title}</div>
+                        <div className="text-[10px] text-neutral-400 font-mono">Role: {m.role}</div>
+                      </td>
+
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {memberTeams.length > 0 ? (
+                            memberTeams.map(t => (
+                              <span 
+                                key={t.id} 
+                                className="group/pill inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+                              >
+                                <span 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedTeamId(t.id);
+                                  }}
+                                  className="hover:underline cursor-pointer"
+                                >
+                                  {t.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveMemberFromSpecificTeam(t.id, m);
+                                  }}
+                                  className="opacity-40 group-hover/pill:opacity-100 hover:text-red-500 transition-opacity cursor-pointer p-0.5"
+                                  title={`Remove ${m.name} from ${t.name}`}
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-neutral-400 font-mono">Unassigned</span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                          {m.capacityHoursPerWeek || 40} hrs / wk
+                        </span>
+                      </td>
+
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {selectedTeam ? (
+                            <>
+                              <button
+                                onClick={() => pushPanel({ type: 'person', id: m.id })}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                title="View Profile Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              {!isLeadOfSelected && (
+                                <button
+                                  onClick={() => handleRemoveMemberFromCurrentTeam(m)}
+                                  className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                  title={`Remove ${m.name} from ${selectedTeam.name}`}
+                                >
+                                  <UserMinus className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => setOrgUserToRemove(m)}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                title={`Remove ${m.name} from organization`}
+                              >
+                                <UserX className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setAssigningUser(m);
+                                  setTargetTeamId(teams[0]?.id || '');
+                                }}
+                                className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Assign to team"
+                              >
+                                <Plus className="w-3 h-3" />
+                                Assign Team
+                              </button>
+
+                              <button
+                                onClick={() => pushPanel({ type: 'person', id: m.id })}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                title="View Profile Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => setOrgUserToRemove(m)}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                title={`Remove ${m.name} from organization`}
+                              >
+                                <UserX className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Remove Member from Organization Confirmation Modal */}
+      {orgUserToRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                  Remove Member from Organization
+                </h3>
+                <p className="text-xs text-neutral-500 font-mono">
+                  Revoke workspace access
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-700 dark:text-neutral-300 font-sans leading-relaxed">
+              Are you sure you want to remove <span className="font-bold text-neutral-900 dark:text-neutral-100">{orgUserToRemove.name}</span> ({orgUserToRemove.email}) from <strong>{currentOrgName || 'this workspace'}</strong>?
+            </p>
+
+            <div className="p-3 rounded-xl bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-[11px] text-red-800 dark:text-red-300 font-mono space-y-1">
+              <div>• User will lose access to all projects, tasks, and goals in this organization.</div>
+              <div>• They will be unassigned from all team rosters.</div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setOrgUserToRemove(null)}
+                className="px-4 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-bold font-mono hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRemoveFromOrg}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold font-mono hover:bg-red-700 shadow-sm cursor-pointer"
+              >
+                Yes, Remove from Organization
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated "Manage Team Members" Modal */}
+      {isManageMembersOpen && managingTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    Add Members to {managingTeam.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 font-mono">
+                    Select organization members to assign to this team
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsManageMembersOpen(false);
+                  setManagingTeam(null);
+                }}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManageMembers} className="space-y-4">
+              {/* Search & Bulk Selection Actions */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={manageSearchQuery}
+                    onChange={e => setManageSearchQuery(e.target.value)}
+                    placeholder="Search organization members by name or email..."
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between px-1 text-[11px] font-mono">
+                  <span className="text-neutral-500">
+                    {selectedMemberIds.length} of {users.length} members selected
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMemberIds(users.map(u => u.id))}
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-neutral-300 dark:text-neutral-700">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMemberIds(managingTeam.leadId ? [managingTeam.leadId] : [])}
+                      className="text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 font-bold cursor-pointer"
+                    >
+                      Deselect Non-Leads
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Members Checklist */}
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 border border-neutral-100 dark:border-neutral-800 rounded-xl p-2 bg-neutral-50/50 dark:bg-neutral-950/50">
+                {users
+                  .filter(u => 
+                    u.name.toLowerCase().includes(manageSearchQuery.toLowerCase()) ||
+                    u.email.toLowerCase().includes(manageSearchQuery.toLowerCase()) ||
+                    u.role.toLowerCase().includes(manageSearchQuery.toLowerCase())
+                  )
+                  .map(user => {
+                    const isSelected = selectedMemberIds.includes(user.id);
+                    const isLead = managingTeam.leadId === user.id;
+
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => {
+                          if (isLead) return; // Lead cannot be deselected
+                          if (isSelected) {
+                            setSelectedMemberIds(prev => prev.filter(id => id !== user.id));
+                          } else {
+                            setSelectedMemberIds(prev => [...prev, user.id]);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-white dark:bg-neutral-800 border-neutral-900/40 dark:border-neutral-100/40 shadow-xs'
+                            : 'bg-white/60 dark:bg-neutral-900/60 border-neutral-200/60 dark:border-neutral-800/60 hover:border-neutral-300 dark:hover:border-neutral-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-colors ${
+                            isSelected
+                              ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                              : 'border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800'
+                          }`}>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                          </div>
+
+                          <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
+
+                          <div className="min-w-0">
+                            <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5 truncate">
+                              <span>{user.name}</span>
+                              {isLead && (
+                                <span className="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shrink-0">
+                                  TEAM LEAD
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-neutral-400 font-mono truncate">{user.email} • {user.role}</div>
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-mono font-semibold text-neutral-400 shrink-0 ml-2">
+                          {user.title || user.role}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between font-mono">
+                <span className="text-[10px] text-neutral-400">
+                  {selectedMemberIds.length} members will belong to this team.
+                </span>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManageMembersOpen(false);
+                      setManagingTeam(null);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs hover:opacity-90 transition-opacity shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Save Members
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Assign User to Team Modal */}
+      {assigningUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    Assign {assigningUser.name} to Team
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 font-mono">Select a team workspace</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setAssigningUser(null)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAssignUserToTeam} className="space-y-4">
+              <div>
+                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1 uppercase">
+                  Select Team
+                </label>
+                <select
+                  value={targetTeamId}
+                  onChange={e => setTargetTeamId(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.workflowTemplate || 'SoftwareSprint'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2 font-mono">
+                <button
+                  type="button"
+                  onClick={() => setAssigningUser(null)}
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs hover:opacity-90 transition-opacity shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Assign to Team
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Edit Team Info Modal */}
       {editingTeam && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold">
@@ -362,13 +906,13 @@ export const TeamScreen: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">Edit Team Info</h3>
-                  <p className="text-[11px] text-neutral-500 font-mono">Update team settings &amp; workflow template</p>
+                  <p className="text-[11px] text-neutral-500 font-mono">Update team settings, lead, &amp; members</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setEditingTeam(null)}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -389,49 +933,104 @@ export const TeamScreen: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1 uppercase">
-                  Workflow Template
-                </label>
-                <select
-                  value={editTemplate}
-                  onChange={e => setEditTemplate(e.target.value as WorkflowTemplate)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {WORKFLOW_TEMPLATES.map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1 uppercase">
+                    Workflow Template
+                  </label>
+                  <select
+                    value={editTemplate}
+                    onChange={e => setEditTemplate(e.target.value as WorkflowTemplate)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {WORKFLOW_TEMPLATES.map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1 uppercase">
+                    Team Lead
+                  </label>
+                  <select
+                    value={editLeadId}
+                    onChange={e => {
+                      const newLId = e.target.value;
+                      setEditLeadId(newLId);
+                      if (newLId && !editMemberIds.includes(newLId)) {
+                        setEditMemberIds(prev => [...prev, newLId]);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Select Team Lead --</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block mb-1 uppercase">
-                  Team Lead
+              {/* Members Selection Checklist in Edit Modal */}
+              <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                <label className="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 block uppercase">
+                  Assign Team Members ({editMemberIds.length} selected)
                 </label>
-                <select
-                  value={editLeadId}
-                  onChange={e => setEditLeadId(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Select Team Lead --</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
+                <div className="max-h-40 overflow-y-auto space-y-1 pr-1 border border-neutral-100 dark:border-neutral-800 rounded-xl p-2 bg-neutral-50/50 dark:bg-neutral-950/50">
+                  {users.map(user => {
+                    const isSelected = editMemberIds.includes(user.id);
+                    const isLead = editLeadId === user.id;
+
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => {
+                          if (isLead) return;
+                          if (isSelected) {
+                            setEditMemberIds(prev => prev.filter(id => id !== user.id));
+                          } else {
+                            setEditMemberIds(prev => [...prev, user.id]);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer ${
+                          isSelected
+                            ? 'bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700'
+                            : 'bg-transparent border-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                            isSelected ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white' : 'border-neutral-300 dark:border-neutral-600'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
+                          <span className="font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
+                          {isLead && (
+                            <span className="text-[8px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-1 py-0.2 rounded">
+                              LEAD
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-neutral-400 font-mono">{user.role}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2 font-mono">
                 <button
                   type="button"
                   onClick={() => setEditingTeam(null)}
-                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs hover:opacity-90 transition-opacity shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs hover:opacity-90 transition-opacity shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Save Changes
@@ -463,14 +1062,14 @@ export const TeamScreen: React.FC = () => {
             <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2 font-mono">
               <button
                 onClick={() => setDeletingTeamId(null)}
-                className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
 
               <button
                 onClick={() => handleDeleteTeamConfirm(deletingTeamId)}
-                className="px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-700 shadow-sm"
+                className="px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-700 shadow-sm cursor-pointer"
               >
                 Delete Team
               </button>

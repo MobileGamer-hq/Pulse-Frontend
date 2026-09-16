@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, User, Key, CheckCircle2, Loader2, ArrowRight, Building2, Check, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { PulseLogo } from '../common/PulseLogo';
 import { organizationService } from '../../services/organizationService';
 import { authService } from '../../services/authService';
 import { supabase } from '../../services/supabaseClient';
@@ -12,7 +13,7 @@ interface InviteAcceptanceScreenProps {
 }
 
 export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ onSuccess, onComplete }) => {
-  const { setActiveScreen, setCurrentOrgSlug } = useApp();
+  const { setCurrentOrgSlug, updateCurrentUser } = useApp();
   const navigate = useNavigate();
   const params = useParams<{ token?: string }>();
 
@@ -67,55 +68,83 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
       return;
     }
 
     setLoading(true);
     try {
-      const userName = fullName.trim() || email.split('@')[0];
+      let user: any = null;
+      let session: any = null;
 
-      // Try Supabase auth first
-      let authUserId = '';
       if (authMode === 'signup') {
+        const cleanFullName = fullName.trim() || cleanEmail.split('@')[0];
         const { data, error: sbErr } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: cleanEmail,
           password,
+          options: {
+            data: {
+              full_name: cleanFullName,
+            },
+          },
         });
-        if (sbErr && !sbErr.message.includes('already registered')) {
-          throw sbErr;
+        if (sbErr) {
+          setError(sbErr.message || 'Failed to sign up.');
+          setLoading(false);
+          return;
         }
-        authUserId = data?.user?.id || 'usr-' + Date.now();
+        user = data.user;
+        session = data.session;
       } else {
         const { data, error: sbErr } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: cleanEmail,
           password,
         });
         if (sbErr) {
-          throw sbErr;
+          setError(sbErr.message || 'Invalid email or password.');
+          setLoading(false);
+          return;
         }
-        authUserId = data?.user?.id || 'usr-' + Date.now();
+        user = data.user;
+        session = data.session;
       }
 
-      localStorage.setItem('pulse_auth_token', 'session-token-' + Date.now());
-      localStorage.setItem('pulse_user_id', authUserId);
-      localStorage.setItem('pulse_user_email', email);
+      if (!user) {
+        setError('Authentication failed. No user found.');
+        setLoading(false);
+        return;
+      }
+
+      const userId = user.id;
+      const userName = user.user_metadata?.full_name || fullName.trim() || cleanEmail.split('@')[0];
+
+      await supabase.from('users').upsert({
+        id: userId,
+        email: cleanEmail,
+        full_name: userName,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      localStorage.setItem('pulse_auth_token', session?.access_token || userId);
+      localStorage.setItem('pulse_user_id', userId);
+      localStorage.setItem('pulse_user_email', cleanEmail);
       localStorage.setItem('pulse_user_name', userName);
 
-      await authService.syncUser({
-        email: email.trim(),
-        fullName: userName,
-      }).catch(() => null);
+      updateCurrentUser({
+        id: userId,
+        email: cleanEmail,
+        name: userName,
+      });
 
       setIsAuthenticated(true);
     } catch (err: any) {
-      // Fallback for offline/test environments
-      localStorage.setItem('pulse_auth_token', 'demo-auth-token');
-      localStorage.setItem('pulse_user_id', 'usr-' + Date.now());
-      localStorage.setItem('pulse_user_email', email);
-      localStorage.setItem('pulse_user_name', fullName.trim() || email.split('@')[0]);
-      setIsAuthenticated(true);
+      setError(err.message || 'Failed to authenticate.');
     } finally {
       setLoading(false);
     }
@@ -134,10 +163,11 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
     setLoading(true);
     try {
       const acceptRes = await organizationService.acceptInviteByToken(inviteToken.trim());
-      const joinedSlug = acceptRes?.organization?.slug || inviteDetails?.organization?.slug || 'apexdynamics';
+      const joinedSlug = acceptRes?.orgSlug || acceptRes?.organization?.slug || inviteDetails?.organization?.slug || 'epicordia';
 
       localStorage.setItem('pulse_tenant_slug', joinedSlug);
       localStorage.setItem(`pulse_org_status_${joinedSlug}`, 'APPROVED');
+      localStorage.setItem('pulse_is_new_user', 'false');
       setCurrentOrgSlug(joinedSlug);
 
       if (onComplete) {
@@ -148,6 +178,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
         navigate(`/${joinedSlug}/dashboard`);
       }
     } catch (err: any) {
+      console.warn('[InviteAcceptanceScreen error]:', err);
       setError(err.message || 'Failed to accept invitation token.');
     } finally {
       setLoading(false);
@@ -163,9 +194,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
             {/* Header Logo */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold text-xs shadow-sm">
-                  ◇
-                </div>
+                <PulseLogo size="xs" />
                 <div>
                   <span className="font-bold text-sm tracking-tight block leading-tight">Pulse</span>
                   <span className="text-[9px] text-neutral-400 font-mono block">by Epicordia</span>
@@ -173,7 +202,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
               </div>
 
               <button
-                onClick={() => setActiveScreen('welcome')}
+                onClick={() => navigate('/welcome')}
                 className="font-mono text-xs text-neutral-500 hover:text-black dark:hover:text-white cursor-pointer"
               >
                 ← Welcome
@@ -312,11 +341,8 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    localStorage.removeItem('pulse_auth_token');
-                    setIsAuthenticated(false);
-                  }}
-                  className="text-[10px] font-mono text-neutral-400 hover:text-red-500 underline"
+                  onClick={() => authService.signOut()}
+                  className="text-[10px] font-mono text-neutral-400 hover:text-red-500 underline cursor-pointer"
                 >
                   Switch Account
                 </button>
@@ -370,7 +396,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
                       {inviteDetails.organization?.name || 'Workspace'}
                     </div>
                     <div className="text-[10px] font-mono text-neutral-400">
-                      pulse.app/{inviteDetails.organization?.slug}
+                      pulse.epicordia.com/{inviteDetails.organization?.slug}
                     </div>
                   </div>
                 </div>
@@ -405,9 +431,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-xs">
-                    ◇
-                  </div>
+                  <PulseLogo size="md" />
                   <div>
                     <div className="font-bold text-xs">Multi-Tenant Alignment</div>
                     <div className="text-[10px] font-mono text-neutral-400">Join multiple teams seamlessly</div>

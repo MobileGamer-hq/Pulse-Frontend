@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Building2, Plus, ArrowRight, Users, ChevronRight, Clock, Key, Check, X, Mail, Loader2, AlertTriangle } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
+import { PulseLogo } from '../common/PulseLogo';
+import { WorkspaceGlassLoader } from '../common/WorkspaceGlassLoader';
+import { AnimatePresence } from 'framer-motion';
 
 export const OrgSwitcherScreen: React.FC = () => {
   const { 
@@ -13,12 +16,19 @@ export const OrgSwitcherScreen: React.FC = () => {
     users,
     pendingInvites, 
     inAppAcceptInvite, 
-    inAppDeclineInvite 
+    inAppDeclineInvite,
+    isWorkspaceLoading,
+    refreshWorkspaceData
   } = useApp();
   const navigate = useNavigate();
 
   const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Always refresh organization memberships on mount to ensure fresh state
+  React.useEffect(() => {
+    refreshWorkspaceData(false);
+  }, []);
 
   const organizations = userOrgs || [];
 
@@ -42,9 +52,7 @@ export const OrgSwitcherScreen: React.FC = () => {
       {/* Header Bar */}
       <div className="max-w-4xl w-full mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold flex items-center justify-center text-sm tracking-tighter shadow-md">
-            ◇
-          </div>
+          <PulseLogo size="lg" className="shadow-xs" />
           <div>
             <div className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 tracking-tight">Pulse</div>
             <div className="text-[10px] text-neutral-500 font-mono">by Epicordia</div>
@@ -116,7 +124,7 @@ export const OrgSwitcherScreen: React.FC = () => {
                           </span>
                         </div>
                         <div className="text-[11px] font-mono text-neutral-500 mt-1">
-                          Invited by {inv.creator?.fullName || inv.creator?.email || 'Admin'} • pulse.app/{org.slug}
+                          Invited by {inv.creator?.fullName || inv.creator?.email || 'Admin'} • pulse.epicordia.com/{org.slug}
                         </div>
                       </div>
                     </div>
@@ -127,10 +135,12 @@ export const OrgSwitcherScreen: React.FC = () => {
                         onClick={async () => {
                           try {
                             setProcessingInviteId(inv.id);
-                            await inAppAcceptInvite(inv.id);
-                            localStorage.setItem('pulse_tenant_slug', org.slug);
-                            setCurrentOrgSlug(org.slug);
-                            navigate(`/${org.slug}/dashboard`);
+                            const acceptRes = await inAppAcceptInvite(inv.id);
+                            const targetSlug = acceptRes?.orgSlug || org.slug || 'epicordia';
+                            localStorage.setItem('pulse_tenant_slug', targetSlug);
+                            localStorage.setItem(`pulse_org_status_${targetSlug}`, 'APPROVED');
+                            setCurrentOrgSlug(targetSlug);
+                            navigate(`/${targetSlug}/dashboard`);
                           } catch (err: any) {
                             setActionError(err.message || 'Failed to accept invitation');
                             setProcessingInviteId(null);
@@ -227,7 +237,7 @@ export const OrgSwitcherScreen: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-3 text-[11px] font-mono text-neutral-500 mt-1">
-                          <span>pulse.app/{org.slug}</span>
+                          <span>pulse.epicordia.com/{org.slug}</span>
                           <span>•</span>
                           <span className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
@@ -289,6 +299,16 @@ export const OrgSwitcherScreen: React.FC = () => {
         <span>Pulse by Epicordia • Enterprise Alignment Engine</span>
         <span>Logged in as {currentUser.email || 'user@company.com'}</span>
       </div>
+
+      {/* Floating Glass Background Blur Loading Overlay */}
+      <AnimatePresence>
+        {isWorkspaceLoading && (
+          <WorkspaceGlassLoader 
+            message="Loading Your Organizations"
+            subMessage="Retrieving your workspaces, permissions & pending invitations..."
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

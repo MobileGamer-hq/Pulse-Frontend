@@ -8,18 +8,21 @@ import {
 import { 
   Plus, MoreHorizontal, UserPlus, Link2, 
   ChevronDown, Target, GripVertical,
-  User, Calendar, ArrowLeft, Trash2
+  User, Calendar, ArrowLeft, Trash2, RotateCw
 } from 'lucide-react';
 
-const ROLLUP_PROGRESS_DATA = [
-  { week: 'W1', actual: 10, expected: 15 },
-  { week: 'W4', actual: 28, expected: 35 },
-  { week: 'W8', actual: 54, expected: 65 },
-  { week: 'W12', actual: 68, expected: 90 }
-];
-
 export const GoalsScreen: React.FC = () => {
-  const { goals, reorderGoals, updateGoal } = useApp();
+  const { goals, reorderGoals, updateGoal, tasks, users, currentUser, refreshWorkspaceData } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshWorkspaceData(false);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   // Screen view state: 'grid' | 'detail' | 'create_kr'
   const [viewState, setViewState] = useState<'grid' | 'detail' | 'create_kr'>('grid');
@@ -152,8 +155,18 @@ export const GoalsScreen: React.FC = () => {
               </div>
 
               <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="px-3.5 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Sync goals with database"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+
+              <button
                 onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'goal' } }))}
-                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-bold text-xs rounded-lg hover:opacity-90 flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-bold text-xs rounded-lg hover:opacity-90 flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> New Objective
               </button>
@@ -230,7 +243,7 @@ export const GoalsScreen: React.FC = () => {
 
                   <div className="flex justify-between items-center pt-2">
                     <div className="flex items-center gap-2">
-                      <img src={obj.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      <UserAvatar name={obj.owner} size="xs" />
                       <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">{obj.owner}</span>
                     </div>
 
@@ -352,20 +365,24 @@ export const GoalsScreen: React.FC = () => {
                 ) : (
                   <div>
                     <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug font-sans">
-                      {selectedGoal?.title || 'Accelerate Platform Performance & Reduce Latency'}
+                      {selectedGoal?.title || 'Strategic Objective'}
                     </h1>
-                    <p className="text-xs text-neutral-500 font-sans leading-relaxed mt-1">
-                      {selectedGoal?.description || 'Optimize core infrastructure to deliver high performance.'}
-                    </p>
+                    {selectedGoal?.description && (
+                      <p className="text-xs text-neutral-500 font-sans leading-relaxed mt-1">
+                        {selectedGoal.description}
+                      </p>
+                    )}
 
                     <div className="flex items-center gap-2 pt-3 text-xs">
-                      <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-neutral-400" />
-                        {selectedGoal?.ownerName || 'Elena Rostova'}
-                      </span>
+                      {selectedGoal?.ownerName && (
+                        <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-neutral-400" />
+                          {selectedGoal.ownerName}
+                        </span>
+                      )}
                       <span className="px-3 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                        {selectedGoal?.targetDate || 'Current Quarter'}
+                        {selectedGoal?.targetDate || 'Current Period'}
                       </span>
                     </div>
                   </div>
@@ -500,106 +517,147 @@ export const GoalsScreen: React.FC = () => {
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
               <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 block font-sans">Progress Rollup</span>
 
-              <div className="h-44 w-full pt-2 font-mono">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={ROLLUP_PROGRESS_DATA}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E4E9" opacity={0.3} />
-                    <XAxis dataKey="week" stroke="#9CA3AF" fontSize={10} />
-                    <YAxis domain={[0, 100]} stroke="#9CA3AF" fontSize={10} />
-                    <Tooltip contentStyle={{ backgroundColor: '#14161F', borderRadius: '8px', color: '#FFF' }} />
-                    <Line type="monotone" dataKey="expected" stroke="#9CA3AF" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="actual" stroke="#000" strokeWidth={2.5} dot={{ r: 3, fill: '#000' }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {(() => {
+                const progress = selectedGoal && selectedGoal.keyResults.length > 0
+                  ? Math.round(selectedGoal.keyResults.reduce((acc, kr) => acc + (kr.currentValue / (kr.targetValue || 1)), 0) / selectedGoal.keyResults.length * 100)
+                  : 0;
 
-              <div className="flex justify-center gap-6 text-[10px] font-mono text-neutral-400">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-black dark:bg-white" /> Actual</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-neutral-400 border-dashed" /> Expected</span>
-              </div>
+                if (!selectedGoal?.keyResults || selectedGoal.keyResults.length === 0) {
+                  return (
+                    <div className="h-44 flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl space-y-1.5">
+                      <Target className="w-6 h-6 text-neutral-400" />
+                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No Key Results Defined</p>
+                      <p className="text-[11px] text-neutral-500 font-mono">Add key results above to visualize rollup progress.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    <div className="h-44 w-full pt-2 font-mono">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={[
+                          { week: 'W1', actual: Math.round(progress * 0.2), expected: 25 },
+                          { week: 'W2', actual: Math.round(progress * 0.5), expected: 50 },
+                          { week: 'W3', actual: Math.round(progress * 0.8), expected: 75 },
+                          { week: 'W4', actual: progress, expected: 100 },
+                        ]}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E4E9" opacity={0.3} />
+                          <XAxis dataKey="week" stroke="#9CA3AF" fontSize={10} />
+                          <YAxis domain={[0, 100]} stroke="#9CA3AF" fontSize={10} />
+                          <Tooltip contentStyle={{ backgroundColor: '#14161F', borderRadius: '8px', color: '#FFF' }} />
+                          <Line type="monotone" dataKey="expected" stroke="#9CA3AF" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
+                          <Line type="monotone" dataKey="actual" stroke="#000" strokeWidth={2.5} dot={{ r: 3, fill: '#000' }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="flex justify-center gap-6 text-[10px] font-mono text-neutral-400">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-black dark:bg-white" /> Actual ({progress}%)</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-neutral-400 border-dashed" /> Expected</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Linked Tasks & Contributors Grid matching Screenshot 2 */}
+          {/* Linked Tasks & Contributors Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono">
             {/* Linked Tasks Table (2 Cols) */}
             <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
-              <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans block">Linked Tasks</span>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
-                    <tr>
-                      <th className="pb-2">ID</th>
-                      <th className="pb-2">Task</th>
-                      <th className="pb-2">Status</th>
-                      <th className="pb-2 text-right">Effort (h)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    <tr>
-                      <td className="py-3 font-semibold text-neutral-500">TSK-892</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">Audit current edge node configurations</td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">DONE</span>
-                      </td>
-                      <td className="py-3 text-right font-bold text-neutral-900 dark:text-neutral-100">12.5</td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3 font-semibold text-neutral-500">TSK-904</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">Deploy caching layer v2 to US-East</td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">IN PROGRESS</span>
-                      </td>
-                      <td className="py-3 text-right font-bold text-neutral-900 dark:text-neutral-100">8.0</td>
-                    </tr>
-
-                    <tr>
-                      <td className="py-3 font-semibold text-neutral-500">TSK-915</td>
-                      <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">Database index optimization query set A</td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-500">TODO</span>
-                      </td>
-                      <td className="py-3 text-right text-neutral-400">--</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans block">Linked Tasks</span>
+                <span className="text-[10px] font-mono text-neutral-400">
+                  {tasks.filter(t => t.linkedGoalId === selectedGoal?.id || (selectedGoal?.linkedTaskIds && selectedGoal.linkedTaskIds.includes(t.id))).length} Linked
+                </span>
               </div>
+
+              {(() => {
+                const linkedTasks = tasks.filter(t => t.linkedGoalId === selectedGoal?.id || (selectedGoal?.linkedTaskIds && selectedGoal.linkedTaskIds.includes(t.id)));
+                if (linkedTasks.length === 0) {
+                  return (
+                    <div className="py-8 text-center border border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl space-y-2">
+                      <p className="text-xs text-neutral-500 font-mono">No tasks linked to this objective yet.</p>
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'task' } }))}
+                        className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        + Create &amp; Link Task
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="text-[10px] text-neutral-400 border-b border-neutral-100 dark:border-neutral-800 uppercase">
+                        <tr>
+                          <th className="pb-2">ID</th>
+                          <th className="pb-2">Task</th>
+                          <th className="pb-2">Status</th>
+                          <th className="pb-2 text-right">Effort (h)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {linkedTasks.map(t => (
+                          <tr key={t.id}>
+                            <td className="py-3 font-semibold text-neutral-500">TSK-{(t.id || '').slice(0, 6).toUpperCase()}</td>
+                            <td className="py-3 font-sans font-semibold text-neutral-900 dark:text-neutral-100">{t.title}</td>
+                            <td className="py-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === 'Done' ? 'bg-emerald-100 text-emerald-800' :
+                                t.status === 'Blocked' ? 'bg-red-100 text-red-800' :
+                                t.status === 'InProgress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300'
+                              }`}>
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right font-bold text-neutral-900 dark:text-neutral-100">
+                              {t.actualHours || t.estimatedHours || '--'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Contributors Card */}
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Contributors</span>
-                <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500">4 Members</span>
-              </div>
+              {(() => {
+                const linkedTasks = tasks.filter(t => t.linkedGoalId === selectedGoal?.id || (selectedGoal?.linkedTaskIds && selectedGoal.linkedTaskIds.includes(t.id)));
+                const assigneeIds = Array.from(new Set(linkedTasks.flatMap(t => t.assigneeIds || [])));
+                const activeContributors = users.filter(u => assigneeIds.includes(u.id));
+                const listToRender = activeContributors.length > 0 ? activeContributors : (currentUser ? [currentUser] : users.slice(0, 1));
 
-              <div className="space-y-3 font-sans">
-                <div className="flex items-center gap-3">
-                  <UserAvatar name="Elena Rostova" size="sm" />
-                  <div>
-                    <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Elena Rostova</div>
-                    <div className="text-[10px] font-mono text-neutral-400">Objective Owner</div>
-                  </div>
-                </div>
+                return (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Contributors</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 font-mono">
+                        {listToRender.length} {listToRender.length === 1 ? 'Member' : 'Members'}
+                      </span>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                  <UserAvatar name="Alex Chen" size="sm" />
-                  <div>
-                    <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Alex Chen</div>
-                    <div className="text-[10px] font-mono text-neutral-400">Backend Lead</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <UserAvatar name="Sarah Jenkins" size="sm" />
-                  <div>
-                    <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">Sarah Jenkins</div>
-                    <div className="text-[10px] font-mono text-neutral-400">DevOps</div>
-                  </div>
-                </div>
-              </div>
+                    <div className="space-y-3 font-sans">
+                      {listToRender.map(m => (
+                        <div key={m.id} className="flex items-center gap-3">
+                          <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
+                          <div>
+                            <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">{m.name}</div>
+                            <div className="text-[10px] font-mono text-neutral-400">{m.title || m.role || 'Objective Contributor'}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

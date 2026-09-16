@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
 import { SpiderWebCanvas } from './SpiderWebCanvas';
@@ -10,15 +11,27 @@ import {
 import type { EntityType } from '../../types';
 
 export const RelationshipsScreen: React.FC = () => {
-  const { setActiveScreen, pushPanel, projects, tasks, goals } = useApp();
+  const navigate = useNavigate();
+  const { setActiveScreen, pushPanel, projects, tasks, goals, users, teams, tags, currentOrgSlug } = useApp();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeType, setSelectedNodeType] = useState<EntityType | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
   const [isFolderSidebarCollapsed, setIsFolderSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelectNode = (id: string, type?: EntityType, fromCanvas = false) => {
     setSelectedNodeId(id);
+    if (type) {
+      setSelectedNodeType(type);
+    } else {
+      if (id.startsWith('proj-') || projects.some(p => p.id === id)) setSelectedNodeType('project');
+      else if (id.startsWith('usr-') || id.startsWith('user-') || users.some(u => u.id === id)) setSelectedNodeType('person');
+      else if (id.startsWith('task-') || tasks.some(t => t.id === id)) setSelectedNodeType('task');
+      else if (id.startsWith('team-') || teams.some(t => t.id === id)) setSelectedNodeType('team');
+      else if (id.startsWith('goal-') || goals.some(g => g.id === id)) setSelectedNodeType('goal');
+      else if (id.startsWith('tag-') || tags.some(t => t.id === id)) setSelectedNodeType('tag');
+    }
 
     if (fromCanvas && type) {
       if (type === 'project') {
@@ -41,43 +54,104 @@ export const RelationshipsScreen: React.FC = () => {
   const handleOpenDetailDrawer = () => {
     if (!selectedNodeId) return;
 
-    if (selectedNodeId.startsWith('proj-')) {
-      const id = selectedNodeId.replace('proj-', '');
-      pushPanel({ type: 'project', id });
-    } else if (selectedNodeId.startsWith('usr-') || selectedNodeId.startsWith('user-')) {
-      const id = selectedNodeId.replace('usr-', '');
-      pushPanel({ type: 'person', id });
-    } else if (selectedNodeId.startsWith('task-')) {
-      const id = selectedNodeId.replace('task-', '');
-      pushPanel({ type: 'task', id });
-    } else if (selectedNodeId.startsWith('goal-')) {
-      const id = selectedNodeId.replace('goal-', '');
-      pushPanel({ type: 'goal', id });
-    } else if (selectedNodeId.startsWith('tag-')) {
-      const id = selectedNodeId.replace('tag-', '');
-      pushPanel({ type: 'tag', id });
-    } else {
-      pushPanel({ type: 'project', id: projects[0]?.id || 'proj-1' });
+    let rawId = selectedNodeId;
+    if (rawId === 'core-org' || rawId === 'org-core') {
+      setActiveScreen('dashboard');
+      navigate(`/${currentOrgSlug || 'epicordia'}/dashboard`);
+      return;
+    }
+
+    if (rawId.startsWith('usr-') || rawId.startsWith('user-')) {
+      rawId = rawId.replace(/^usr-|^user-/, '');
+      if (rawId.includes('-team-')) rawId = rawId.split('-team-')[0];
+      if (rawId.includes('-proj-')) rawId = rawId.split('-proj-')[0];
+      pushPanel({ type: 'person', id: rawId });
+      return;
+    }
+    if (rawId.startsWith('proj-')) {
+      pushPanel({ type: 'project', id: rawId.replace(/^proj-/, '') });
+      return;
+    }
+    if (rawId.startsWith('task-')) {
+      pushPanel({ type: 'task', id: rawId.replace(/^task-/, '') });
+      return;
+    }
+    if (rawId.startsWith('goal-')) {
+      pushPanel({ type: 'goal', id: rawId.replace(/^goal-/, '') });
+      return;
+    }
+    if (rawId.startsWith('tag-')) {
+      pushPanel({ type: 'tag', id: rawId.replace(/^tag-/, '') });
+      return;
+    }
+    if (rawId.startsWith('team-')) {
+      const cleanTeamId = rawId.replace(/^team-/, '');
+      const t = teams.find(team => team.id === cleanTeamId || team.id === rawId);
+      if (t?.leadId) pushPanel({ type: 'person', id: t.leadId });
+      else {
+        setActiveScreen('team');
+        navigate(`/${currentOrgSlug || 'epicordia'}/team`);
+      }
+      return;
+    }
+
+    // Direct multi-collection lookups
+    if (selectedNodeType === 'task' || tasks.some(t => t.id === rawId)) {
+      const t = tasks.find(tsk => tsk.id === rawId);
+      if (t) { pushPanel({ type: 'task', id: t.id }); return; }
+    }
+    if (selectedNodeType === 'project' || projects.some(p => p.id === rawId)) {
+      const p = projects.find(prj => prj.id === rawId);
+      if (p) { pushPanel({ type: 'project', id: p.id }); return; }
+    }
+    if (selectedNodeType === 'person' || users.some(u => u.id === rawId)) {
+      const u = users.find(usr => usr.id === rawId);
+      if (u) { pushPanel({ type: 'person', id: u.id }); return; }
+    }
+    if (selectedNodeType === 'goal' || goals.some(g => g.id === rawId)) {
+      const g = goals.find(gl => gl.id === rawId);
+      if (g) { pushPanel({ type: 'goal', id: g.id }); return; }
+    }
+    if (selectedNodeType === 'tag' || tags.some(tg => tg.id === rawId)) {
+      const tg = tags.find(tag => tag.id === rawId);
+      if (tg) { pushPanel({ type: 'tag', id: tg.id }); return; }
+    }
+    if (selectedNodeType === 'team' || teams.some(tm => tm.id === rawId)) {
+      const tm = teams.find(team => team.id === rawId);
+      if (tm?.leadId) { pushPanel({ type: 'person', id: tm.leadId }); return; }
+      setActiveScreen('team');
+      navigate(`/${currentOrgSlug || 'epicordia'}/team`);
+      return;
+    }
+
+    if (projects.length > 0) {
+      pushPanel({ type: 'project', id: projects[0].id });
     }
   };
 
   const handlePresetFocus = (preset: 'all' | 'projects' | 'blocked' | 'goals') => {
     if (preset === 'all') {
       setSelectedNodeId(null);
+      setSelectedNodeType(null);
     } else if (preset === 'projects') {
       if (projects.length > 0) {
         const pId = projects[0].id;
         setSelectedNodeId(`proj-${pId}`);
+        setSelectedNodeType('project');
         setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${pId}`])));
       }
     } else if (preset === 'blocked') {
       const blockedTask = tasks.find(t => t.status === 'Blocked');
       if (blockedTask) {
         setSelectedNodeId(`task-${blockedTask.id}`);
+        setSelectedNodeType('task');
         setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${blockedTask.projectId}`])));
       }
     } else if (preset === 'goals') {
-      if (goals.length > 0) setSelectedNodeId(`goal-${goals[0].id}`);
+      if (goals.length > 0) {
+        setSelectedNodeId(`goal-${goals[0].id}`);
+        setSelectedNodeType('goal');
+      }
     }
   };
 
@@ -88,7 +162,10 @@ export const RelationshipsScreen: React.FC = () => {
         {/* Left: Back Button & Breadcrumbs */}
         <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar">
           <button
-            onClick={() => setActiveScreen('dashboard')}
+            onClick={() => {
+              setActiveScreen('dashboard');
+              navigate(`/${currentOrgSlug || 'epicordia'}/dashboard`);
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity shadow-sm shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -174,14 +251,18 @@ export const RelationshipsScreen: React.FC = () => {
 
         <SpiderWebCanvas
           selectedNodeId={selectedNodeId}
-          onSelectNode={(id) => handleSelectNode(id, undefined, true)}
+          onSelectNode={(id, type) => handleSelectNode(id, type, true)}
           searchQuery={searchQuery}
         />
 
         {/* Floating Bottom-Right Detail Info Popup Card */}
         <NodeDetailPopupCard
           selectedNodeId={selectedNodeId}
-          onClose={() => setSelectedNodeId(null)}
+          selectedNodeType={selectedNodeType}
+          onClose={() => {
+            setSelectedNodeId(null);
+            setSelectedNodeType(null);
+          }}
         />
       </div>
     </div>

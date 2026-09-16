@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../services/supabaseClient';
-import { authService } from '../../services/authService';
+import { PulseLogo } from '../common/PulseLogo';
 
 interface SignInScreenProps {
   onSuccess?: () => void;
@@ -37,48 +37,77 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
 
     setLoading(true);
     try {
-      // 1. Sign in with Supabase Auth
+      const cleanEmail = email.trim().toLowerCase();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
       if (signInError) {
-        throw new Error(signInError.message);
+        setError(signInError.message || 'Invalid email or password. Please try again.');
+        setLoading(false);
+        return;
       }
 
-      const session = data.session;
+      if (!data?.user) {
+        setError('Authentication failed. No user found.');
+        setLoading(false);
+        return;
+      }
+
       const user = data.user;
+      const userId = user.id;
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || cleanEmail.split('@')[0];
+      const authToken = data.session?.access_token || userId;
 
-      if (!user) {
-        throw new Error('Sign in failed: User identity not found.');
-      }
+      // Ensure public.users row exists
+      await supabase.from('users').upsert({
+        id: userId,
+        email: cleanEmail,
+        full_name: fullName,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
 
-      const fullName = user.user_metadata?.full_name || email.split('@')[0];
-      const authToken = session?.access_token || user.id;
-
-      // 2. Update React Context & Save credentials and session token
       updateCurrentUser({
-        id: user.id,
-        email,
+        id: userId,
+        email: cleanEmail,
         name: fullName,
       });
 
       localStorage.setItem('pulse_auth_token', authToken);
-      localStorage.setItem('pulse_user_id', user.id);
-      localStorage.setItem('pulse_user_email', email);
+      localStorage.setItem('pulse_user_id', userId);
+      localStorage.setItem('pulse_user_email', cleanEmail);
       localStorage.setItem('pulse_user_name', fullName);
+      localStorage.removeItem('pulse_user_orgs');
+      localStorage.removeItem('pulse_tenant_slug');
 
-      // 3. Sync user profile with PostgreSQL backend
-      await authService.syncUser({
-        email,
-        fullName,
-      }).catch((syncErr) => console.warn('[Backend User Sync Notice]:', syncErr));
+      // Query user's approved memberships from Supabase
+      try {
+        const { data: memberships } = await supabase
+          .from('organization_memberships')
+          .select('*, organization:organizations(*)')
+          .eq('user_id', userId);
+
+        if (memberships && memberships.length > 0) {
+          const userMemberships = memberships.map((m: any) => ({
+            id: m.organization?.id || m.org_id,
+            name: m.organization?.name || 'Organization',
+            slug: m.organization?.slug || '',
+            role: (m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : 'Member'),
+            status: (m.status || 'approved').toUpperCase(),
+            membersCount: 1,
+            activeProjects: 0,
+          }));
+          localStorage.setItem('pulse_user_orgs', JSON.stringify(userMemberships));
+        }
+      } catch (e) {
+        console.warn('[SignInScreen] Memberships fetch error:', e);
+      }
 
       if (onSuccess) {
         onSuccess();
       } else {
-        window.location.href = '/select-org';
+        navigate('/select-org');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in.');
@@ -90,10 +119,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   return (
     <div className="min-h-screen bg-[#F4F5F7] dark:bg-[#0F1115] flex flex-col items-center justify-center p-4 font-sans text-neutral-900 dark:text-neutral-100">
       {/* Header Logo */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs shadow-sm">
-          ◇
-        </div>
+      <div className="flex items-center gap-2.5 mb-6">
+        <PulseLogo size="md" />
         <div>
           <span className="font-extrabold text-lg tracking-tight block leading-tight">Pulse</span>
           <span className="text-[10px] text-neutral-400 font-mono block">by Epicordia</span>

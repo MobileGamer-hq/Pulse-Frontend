@@ -18,68 +18,21 @@ export interface ToastAlert {
   targetPanel?: DrawerPanel;
 }
 
-const SAMPLE_ALERTS: ToastAlert[] = [
-  {
-    id: 'toast-pulse-1',
-    category: 'pulse',
-    title: 'Daily Pulse Check-in',
-    message: 'Time for your end-of-day reflection! Share today’s blockers & wins with your team.',
-    timeLabel: 'Scheduled Now',
-    actionLabel: 'Check In Now',
-    targetScreen: 'pulse'
-  },
-  {
-    id: 'toast-meeting-1',
-    category: 'meeting',
-    title: 'Upcoming Sprint Planning',
-    message: 'Architecture & Q3 Roadmap Sync starting in 5 minutes with Engineering & Product.',
-    timeLabel: 'In 5 minutes',
-    actionLabel: 'Join Meeting',
-    targetScreen: 'dashboard'
-  },
-  {
-    id: 'toast-task-1',
-    category: 'task',
-    title: 'Task Deadline Alert',
-    message: 'TSK-892 (Database Migration Script) is due in 1 hour.',
-    timeLabel: 'Due 5:00 PM',
-    actionLabel: 'View Task',
-    targetPanel: { type: 'task', id: 'TSK-892' }
-  },
-  {
-    id: 'toast-blocker-1',
-    category: 'blocker',
-    title: 'Critical Blocker Flagged',
-    message: 'James Smith flagged Node A capacity blocker on Enterprise Data Sync.',
-    timeLabel: 'Just now',
-    actionLabel: 'Triage Alert',
-    targetScreen: 'notifications'
-  }
-];
-
 export const InAppNotificationToast: React.FC = () => {
   const { setActiveScreen, pushPanel } = useApp();
   const [activeToast, setActiveToast] = useState<ToastAlert | null>(null);
-  const [queueIndex, setQueueIndex] = useState(0);
-
-  // Toast state initially empty for real user usage
 
   // Listen for custom trigger events from anywhere in the app
   useEffect(() => {
     const handleCustomTrigger = (e: CustomEvent<ToastAlert>) => {
-      if (e.detail) {
+      if (e.detail && e.detail.title) {
         setActiveToast(e.detail);
-      } else {
-        // Cycle through demo alerts
-        const nextAlert = SAMPLE_ALERTS[(queueIndex + 1) % SAMPLE_ALERTS.length];
-        setQueueIndex(prev => (prev + 1) % SAMPLE_ALERTS.length);
-        setActiveToast(nextAlert);
       }
     };
 
     window.addEventListener('pulse:trigger-toast' as any, handleCustomTrigger);
     return () => window.removeEventListener('pulse:trigger-toast' as any, handleCustomTrigger);
-  }, [queueIndex]);
+  }, []);
 
   const handleDismiss = () => {
     setActiveToast(null);

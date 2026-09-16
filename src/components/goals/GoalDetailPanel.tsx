@@ -12,12 +12,19 @@ export const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({ id }) => {
   const { goals, tasks, tags, reorderGoals, attachTagToEntity, detachTagFromEntity } = useApp();
 
   const goal = goals.find(g => g.id === id);
-  if (!goal) return <div className="text-neutral-500 text-sm py-8 text-center">Goal not found.</div>;
 
-  const [krs, setKrs] = useState<KeyResult[]>(goal.keyResults);
+  const [krs, setKrs] = useState<KeyResult[]>(() => goal?.keyResults || []);
   const [draggedKrId, setDraggedKrId] = useState<string | null>(null);
   const [dragOverKrId, setDragOverKrId] = useState<string | null>(null);
   const [isAddingTag, setIsAddingTag] = useState(false);
+
+  React.useEffect(() => {
+    if (goal) {
+      setKrs(goal.keyResults || []);
+    }
+  }, [goal]);
+
+  if (!goal) return <div className="text-neutral-500 text-sm py-8 text-center">Goal not found.</div>;
 
   const handleKrDrop = (targetKrId: string) => {
     if (!draggedKrId || draggedKrId === targetKrId) return;

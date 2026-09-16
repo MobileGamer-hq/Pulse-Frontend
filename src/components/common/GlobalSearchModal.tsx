@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { EntityLink } from './EntityLink';
-import { Search, X, FolderGit2, CheckSquare, Target, Tag as TagIcon, User as UserIcon } from 'lucide-react';
+import { Search, X, FolderGit2, CheckSquare, Target, Tag as TagIcon, User as UserIcon, Building2, Plus, Key, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const GlobalSearchModal: React.FC = () => {
+  const navigate = useNavigate();
   const { isSearchOpen, setIsSearchOpen, users, projects, tasks, goals, tags } = useApp();
   const [query, setQuery] = useState('');
 
@@ -17,6 +19,8 @@ export const GlobalSearchModal: React.FC = () => {
   const matchingTasks = q ? tasks.filter(t => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) : [];
   const matchingGoals = q ? goals.filter(g => g.title.toLowerCase().includes(q)) : [];
   const matchingTags = q ? tags.filter(t => t.name.toLowerCase().includes(q)) : [];
+
+  const showOrgActions = !q || 'organizations'.includes(q) || 'workspaces'.includes(q) || 'create'.includes(q) || 'switch'.includes(q);
 
   const totalResults = matchingUsers.length + matchingProjects.length + matchingTasks.length + matchingGoals.length + matchingTags.length;
 
@@ -49,21 +53,82 @@ export const GlobalSearchModal: React.FC = () => {
           />
           <button
             onClick={() => setIsSearchOpen(false)}
-            className="p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+            className="p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Results Container */}
-        <div className="max-h-[380px] overflow-y-auto p-4 space-y-4">
+        <div className="max-h-[380px] overflow-y-auto p-4 space-y-4 font-sans">
+          {/* Quick Organization Shortcuts */}
+          {showOrgActions && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2 flex items-center gap-1.5 font-mono">
+                <Building2 className="w-3.5 h-3.5" /> Workspace Actions
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    navigate('/select-org');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-neutral-800/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-between text-left transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Building2 className="w-4 h-4 text-neutral-500" />
+                    <div>
+                      <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">Switch Workspace</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">Select or change organization</div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    navigate('/create-org');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-neutral-800/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-between text-left transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Plus className="w-4 h-4 text-neutral-500" />
+                    <div>
+                      <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">Create Organization</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">Launch a new organization</div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    navigate('/join-org');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-neutral-800/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-between text-left transition-colors cursor-pointer sm:col-span-2"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Key className="w-4 h-4 text-neutral-500" />
+                    <div>
+                      <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">Join Organization</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">Join an existing workspace with token or link</div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {!q && (
-            <div className="text-center py-8 text-neutral-400 text-xs">
+            <div className="text-center py-4 text-neutral-400 text-xs">
               Type anything to search across all connected entities in Pulse.
             </div>
           )}
 
-          {q && totalResults === 0 && (
+          {q && totalResults === 0 && !showOrgActions && (
             <div className="text-center py-8 text-neutral-500 text-xs">
               No matching entity found for "{query}".
             </div>

@@ -27,7 +27,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     role: 'Admin',
     title: 'System Administrator & CTO',
     badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-300',
-    description: 'Full organizational authority over workspace configurations, integrations, team provisioning, and RBAC roles.',
+    description: 'Full organizational authority over workspace configurations, integrations, team provisioning, and role permissions.',
     scopeDescription: 'Organization-wide root access & technical infrastructure management',
     permissions: {
       createProjects: true,
@@ -39,7 +39,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
       systemSettings: true,
     },
     keyResponsibilities: [
-      'Manage global organization settings, API tokens, and SSO',
+      'Manage global organization settings, API tokens, and Single Sign-On',
       'Create and archive projects, teams, tags, and users',
       'Override permissions and edit/delete any workspace item',
       'Access full system activity audit logs and security briefs'
@@ -49,8 +49,8 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     role: 'Executive',
     title: 'Executive Leadership (C-Suite / VP)',
     badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300',
-    description: 'Strategic oversight role focused on high-level enterprise OKRs, portfolio reporting, and risk mitigation.',
-    scopeDescription: 'Strategic executive oversight, enterprise OKRs, and portfolio health metrics',
+    description: 'Strategic oversight role focused on high-level enterprise goals, portfolio reporting, and risk mitigation.',
+    scopeDescription: 'Strategic executive oversight, enterprise goals, and portfolio health metrics',
     permissions: {
       createProjects: true,
       createTasks: false,
@@ -86,7 +86,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
       'Create and manage projects, tasks, and sprint timelines',
       'Assign team members and balance weekly workload capacity',
       'Create organizational tags and link tasks to strategic goals',
-      'Review daily EOD check-ins and unblock team bottlenecks'
+      'Review daily check-ins and unblock team bottlenecks'
     ]
   },
   {
@@ -130,7 +130,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
       'Create tasks and assign them to team members',
       'Break down tasks into subtasks and set priority levels',
       'Tag tasks and verify completion criteria',
-      'Submit daily EOD check-ins and highlight team blockers'
+      'Submit daily check-ins and highlight team blockers'
     ]
   },
   {
@@ -152,7 +152,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
       'Create tasks within assigned projects',
       'Update status of assigned tasks (To Do -> In Progress -> Done)',
       'Toggle subtask check items and add comments/discussion',
-      'Submit mandatory daily EOD check-ins with energy index'
+      'Submit mandatory daily check-ins with energy index'
     ]
   },
   {
@@ -160,7 +160,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     title: 'External Contractor / Specialist',
     badgeColor: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-300',
     description: 'External partner with scoped access restricted strictly to assigned tasks and daily check-ins.',
-    scopeDescription: 'External contributor access restricted strictly to assigned tasks and EOD logs',
+    scopeDescription: 'External contributor access restricted strictly to assigned tasks and daily logs',
     permissions: {
       createProjects: false,
       createTasks: false,
@@ -172,7 +172,7 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     },
     keyResponsibilities: [
       'View and update explicitly assigned tasks only',
-      'Submit daily EOD check-ins for logged hours',
+      'Submit daily check-ins for logged hours',
       'Restricted from viewing company goals, executive reports, or admin settings',
       'Restricted from creating top-level projects or organization tags'
     ]
@@ -250,7 +250,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                       <th className="p-2.5 text-center">Admin</th>
                       <th className="p-2.5 text-center">Executive</th>
                       <th className="p-2.5 text-center">Manager</th>
-                      <th className="p-2.5 text-center">HR</th>
+                      <th className="p-2.5 text-center">Human Resources</th>
                       <th className="p-2.5 text-center">TeamLead</th>
                       <th className="p-2.5 text-center">Member</th>
                       <th className="p-2.5 text-center">Contractor</th>
@@ -278,7 +278,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                       <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-semibold flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-neutral-400" /> Manage Goals &amp; OKRs</td>
+                      <td className="p-2.5 font-semibold flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-neutral-400" /> Manage Goals &amp; Objectives</td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>

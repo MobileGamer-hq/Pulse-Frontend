@@ -41,7 +41,7 @@ export function calculateAnalytics(
     return { day, points: pts };
   });
 
-  // EOD Consistency Heatmap (last 36 intervals / 3 months)
+  // Daily Consistency Heatmap (last 36 intervals / 3 months)
   const eodDatesMap = new Map<string, number>();
   eodEntries.forEach(e => {
     const d = e.date ? e.date.split('T')[0] : '';
@@ -209,7 +209,7 @@ export function calculateAnalytics(
   return {
     insights: {
       velocity,
-      velocityUnit: 'pts/sprint',
+      velocityUnit: 'points/sprint',
       completionRate,
       avgDailyFocus: avgFocusHours,
       consistencyScore,

@@ -54,7 +54,7 @@ export const AnalyticsScreen: React.FC = () => {
   const fallbackBlockedHours = blockedTasksList.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
 
   const velocityVal = insights?.velocity ?? fallbackVelocity;
-  const velocityUnit = insights?.velocityUnit ?? 'pts/sprint';
+  const velocityUnit = insights?.velocityUnit ?? 'points/sprint';
   const completionRateVal = insights?.completionRate ?? fallbackCompletionRate;
   const avgDailyFocusVal = insights?.avgDailyFocus ?? 0;
   const consistencyScoreVal = insights?.consistencyScore ?? (tasks.length > 0 ? Math.round(completionRateVal) : 0);
@@ -216,7 +216,7 @@ export const AnalyticsScreen: React.FC = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Sync analytics with database"
+            title="Refresh analytics"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
@@ -228,9 +228,9 @@ export const AnalyticsScreen: React.FC = () => {
             data={[
               { Metric: 'Output Velocity', Value: `${velocityVal} ${velocityUnit}` },
               { Metric: 'Task Completion Rate', Value: `${completionRateVal}%` },
-              { Metric: 'Average Daily Focus', Value: `${avgDailyFocusVal} hrs` },
-              { Metric: 'EOD Consistency Score', Value: `${consistencyScoreVal} / 100` },
-              { Metric: 'Total Blocked Time', Value: `${totalBlockedHours} hrs` },
+              { Metric: 'Average Daily Focus', Value: `${avgDailyFocusVal} hours` },
+              { Metric: 'Daily Consistency Score', Value: `${consistencyScoreVal} / 100` },
+              { Metric: 'Total Blocked Time', Value: `${totalBlockedHours} hours` },
               { Metric: 'Active Sprints Tracked', Value: `${activeSprintsList.length}` }
             ]}
           />
@@ -294,12 +294,12 @@ export const AnalyticsScreen: React.FC = () => {
 
             <div className="p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2">
               <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 uppercase">
-                <span>Avg. Daily Focus</span>
+                <span>Average Daily Focus</span>
                 <Clock className="w-3.5 h-3.5 text-neutral-400" />
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{avgDailyFocusVal}</span>
-                <span className="text-xs text-neutral-500">hrs</span>
+                <span className="text-xs text-neutral-500">hours</span>
               </div>
               <span className="text-[10px] text-neutral-500 block">Active focus tracking</span>
             </div>
@@ -343,7 +343,7 @@ export const AnalyticsScreen: React.FC = () => {
 
             <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4 font-mono">
               <div>
-                <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">EOD Consistency</h3>
+                <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">Daily Consistency</h3>
                 <p className="text-[11px] text-neutral-400">Pulse frequency ({timeRange.toUpperCase()})</p>
               </div>
 
@@ -409,7 +409,7 @@ export const AnalyticsScreen: React.FC = () => {
                   <ScatterChart>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E4E9" opacity={0.4} />
                     <XAxis type="number" dataKey="energy" name="Energy Score" domain={[1, 10]} stroke="#9CA3AF" fontSize={10} />
-                    <YAxis type="number" dataKey="hours" name="Deep Work (hrs)" domain={[0, 8]} stroke="#9CA3AF" fontSize={10} />
+                    <YAxis type="number" dataKey="hours" name="Deep Work (hours)" domain={[0, 8]} stroke="#9CA3AF" fontSize={10} />
                     <ZAxis type="number" range={[50, 50]} />
                     <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#14161F', borderRadius: '8px', color: '#FFF' }} />
                     <Scatter name="Days" data={energyExecutionData} fill="#000" />
@@ -746,7 +746,7 @@ export const AnalyticsScreen: React.FC = () => {
                     {criticalBlockersList.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-8 text-center text-neutral-400 font-mono">
-                          No blocked tasks or bottlenecks recorded in database.
+                          No blocked tasks or bottlenecks recorded.
                         </td>
                       </tr>
                     ) : (
@@ -818,7 +818,7 @@ export const AnalyticsScreen: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Blocked Time Trend</span>
               <div className="flex items-center gap-1 p-0.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg text-xs">
-                <button className="px-2.5 py-1 rounded bg-black text-white dark:bg-white dark:text-black font-bold">7D</button>
+                <button className="px-2.5 py-1 rounded bg-black text-white dark:bg-white dark:text-black font-bold">7 Days</button>
               </div>
             </div>
 

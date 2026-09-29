@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface UserAvatarProps {
   name: string;
@@ -24,10 +24,10 @@ const PRESET_COLORS = [
   '#0891B2', // Cyan
   '#0284C7', // Sky
   '#2563EB', // Blue
-  '#18181B', // Dark Zinc
-  '#1E293B', // Dark Slate
-  '#312E81', // Dark Indigo
-  '#831843', // Deep Pink
+  '#8B5CF6', // Purple
+  '#10B981', // Emerald Light
+  '#F59E0B', // Amber Gold
+  '#06B6D4', // Cyan Light
 ];
 
 // Helper to deterministically generate a color based on user name string
@@ -58,6 +58,14 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     customColor || getDeterministicColor(safeName || 'User')
   );
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  useEffect(() => {
+    if (customColor) {
+      setCurrentColor(customColor);
+    }
+  }, [customColor]);
+
+  const effectiveColor = customColor || currentColor || getDeterministicColor(safeName || 'User');
 
   const initials = safeName
     ? safeName.trim().split(/\s+/).map(part => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
@@ -100,7 +108,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
             }
             if (onClick) onClick();
           }}
-          style={{ backgroundColor: currentColor }}
+          style={{ backgroundColor: effectiveColor }}
           className={`${sizeClasses} rounded-full flex items-center justify-center font-mono font-bold text-white shadow-xs select-none border border-neutral-200/20 cursor-pointer ${className}`}
           title={allowColorChange ? 'Click to customize avatar color' : name}
         >
@@ -112,7 +120,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       {showColorPicker && allowColorChange && (
         <div 
           onClick={e => e.stopPropagation()}
-          className="absolute z-50 mt-1 left-0 p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl flex items-center gap-1.5"
+          className="absolute z-50 mt-2 left-0 p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl grid grid-cols-8 gap-2.5 w-max"
         >
           {PRESET_COLORS.map(c => (
             <button
@@ -120,7 +128,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
               type="button"
               onClick={(e) => handleColorSelect(c, e)}
               style={{ backgroundColor: c }}
-              className={`w-5 h-5 rounded-full border border-white dark:border-black transition-transform hover:scale-110 ${currentColor === c ? 'ring-2 ring-black dark:ring-white' : ''}`}
+              className={`w-6 h-6 rounded-full border border-white dark:border-neutral-800 transition-all cursor-pointer hover:scale-110 ${effectiveColor === c ? 'scale-110 ring-2 ring-black dark:ring-white ring-offset-2 dark:ring-offset-neutral-900 shadow-xs' : 'opacity-85 hover:opacity-100'}`}
+              title={c}
             />
           ))}
         </div>

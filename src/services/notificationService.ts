@@ -3,6 +3,10 @@ import { supabase, getCurrentUserId } from './supabaseClient';
 export const notificationService = {
   getNotifications: async () => {
     const userId = getCurrentUserId();
+    if (!userId || userId.trim() === '') {
+      return { notifications: [] };
+    }
+
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -46,6 +50,8 @@ export const notificationService = {
 
   markAllAsRead: async () => {
     const userId = getCurrentUserId();
+    if (!userId || userId.trim() === '') return { success: true };
+
     const { error } = await supabase
       .from('notifications')
       .update({

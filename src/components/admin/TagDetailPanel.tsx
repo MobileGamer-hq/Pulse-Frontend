@@ -183,7 +183,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
         <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 font-sans">Tagged Tasks ({taggedTasks.length})</h3>
-            <span className="text-[10px] text-neutral-400">Live Database</span>
+            <span className="text-[10px] text-neutral-400">Live</span>
           </div>
 
           {taggedTasks.length === 0 ? (

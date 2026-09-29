@@ -1,92 +1,189 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
-import { SpiderWebCanvas } from './SpiderWebCanvas';
+import { SpiderWebCanvas, type EdgeOverlayFilter } from './SpiderWebCanvas';
+import { RelationshipCarousel } from './RelationshipCarousel';
 import { NodeDetailPopupCard } from './NodeDetailPopupCard';
 import { 
   Search, ShieldAlert, Target, 
-  ChevronRight, ExternalLink, ArrowLeft, Network
+  ChevronRight, ExternalLink, ArrowLeft,
+  RotateCcw, Briefcase, CheckSquare, User as UserIcon, Building2,
+  LayoutGrid, Users, Hexagon
 } from 'lucide-react';
 import type { EntityType } from '../../types';
+import { findUserByAnyId, normalizeEntityId } from '../../utils/projectContributors';
 
 export const RelationshipsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { setActiveScreen, pushPanel, projects, tasks, goals, users, teams, tags, currentOrgSlug } = useApp();
+  const { 
+    setActiveScreen, pushPanel, projects, tasks, goals, users, 
+    teams, tags, currentOrgSlug 
+  } = useApp();
+
+  // Active View Mode: 'carousel' (Master-Detail Daily Driver) | 'spiderweb' (Exploratory Topology Graph)
+  const [viewMode, setViewMode] = useState<'carousel' | 'spiderweb'>('carousel');
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeType, setSelectedNodeType] = useState<EntityType | null>(null);
-  const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
+  
+  // Default expanded state: Ring 0 (Org Core) is open
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => new Set(['core-org']));
+  
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [focusDepth, setFocusDepth] = useState<number>(2);
+  const [edgeOverlayFilter, setEdgeOverlayFilter] = useState<EdgeOverlayFilter>('all');
   const [isFolderSidebarCollapsed, setIsFolderSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSelectNode = (id: string, type?: EntityType, fromCanvas = false) => {
+  // Node Selection Handler
+  const handleSelectNode = (id: string, type?: EntityType, _fromCanvas = false) => {
     setSelectedNodeId(id);
-    if (type) {
-      setSelectedNodeType(type);
-    } else {
-      if (id.startsWith('proj-') || projects.some(p => p.id === id)) setSelectedNodeType('project');
-      else if (id.startsWith('usr-') || id.startsWith('user-') || users.some(u => u.id === id)) setSelectedNodeType('person');
-      else if (id.startsWith('task-') || tasks.some(t => t.id === id)) setSelectedNodeType('task');
-      else if (id.startsWith('team-') || teams.some(t => t.id === id)) setSelectedNodeType('team');
-      else if (id.startsWith('goal-') || goals.some(g => g.id === id)) setSelectedNodeType('goal');
-      else if (id.startsWith('tag-') || tags.some(t => t.id === id)) setSelectedNodeType('tag');
-    }
+    setFocusNodeId(id);
 
-    if (fromCanvas && type) {
-      if (type === 'project') {
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${id}`])));
-      } else if (type === 'task') {
-        const taskObj = tasks.find(t => t.id === id);
-        if (taskObj) {
-          setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${taskObj.projectId}`])));
-        }
+    let resolvedType = type;
+    if (!resolvedType) {
+      if (id.startsWith('proj-') || projects.some(p => p.id === id)) resolvedType = 'project';
+      else if (id.startsWith('usr-tasks-')) resolvedType = 'task';
+      else if (id.startsWith('usr-') || id.startsWith('user-') || users.some(u => u.id === id)) resolvedType = 'person';
+      else if (id.startsWith('task-') || tasks.some(t => t.id === id)) resolvedType = 'task';
+      else if (id.startsWith('team-') || teams.some(t => t.id === id)) resolvedType = 'team';
+      else if (id.startsWith('goal-') || goals.some(g => g.id === id)) resolvedType = 'goal';
+      else if (id.startsWith('tag-') || tags.some(t => t.id === id)) resolvedType = 'tag';
+    }
+    if (resolvedType) setSelectedNodeType(resolvedType);
+
+    // Auto-expand ancestral branch so children remain visible
+    if (id.startsWith('usr-tasks-')) {
+      const userObj = findUserByAnyId(id, users);
+      if (userObj) {
+        setExpandedNodeIds(prev => new Set([...prev, `team-${userObj.teamId}`, `usr-${userObj.id}`]));
+      }
+    } else if (id.startsWith('proj-')) {
+      const projId = id.replace('proj-', '');
+      const proj = projects.find(p => p.id === projId);
+      if (proj) {
+        const teamId = proj.teamIds?.[0] || proj.teamId;
+        setExpandedNodeIds(prev => new Set([...prev, `team-${teamId}`, `proj-${projId}`]));
+      }
+    } else if (id.startsWith('task-')) {
+      const taskId = id.replace('task-', '');
+      const tsk = tasks.find(t => t.id === taskId);
+      if (tsk) {
+        const proj = projects.find(p => p.id === tsk.projectId);
+        const teamId = proj ? (proj.teamIds?.[0] || proj.teamId) : null;
+        setExpandedNodeIds(prev => {
+          const next = new Set(prev);
+          if (teamId) next.add(`team-${teamId}`);
+          next.add(`proj-${tsk.projectId}`);
+          return next;
+        });
       }
     }
   };
 
-  const handleToggleFolder = (id: string) => {
-    setExpandedFolderIds(prev => 
-      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
-    );
+  // Drill-Down into children in Carousel view
+  const handleDrillDown = (id: string, type: EntityType) => {
+    // Expand this node in the tree and set as selected
+    setExpandedNodeIds(prev => new Set([...prev, id]));
+    handleSelectNode(id, type);
   };
 
-  const handleOpenDetailDrawer = () => {
-    if (!selectedNodeId) return;
+  // Toggle Node / Folder Expansion (Bidirectional with Sidebar)
+  const handleToggleExpandNode = (nodeId: string) => {
+    setExpandedNodeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  };
 
-    let rawId = selectedNodeId;
+  // Reset View to Clean Org Core + Teams State
+  const handleResetView = () => {
+    setExpandedNodeIds(new Set(['core-org']));
+    setSelectedNodeId(null);
+    setSelectedNodeType(null);
+    setFocusNodeId(null);
+    setSearchQuery('');
+    setEdgeOverlayFilter('all');
+  };
+
+  // Preset Filters
+  const handlePresetFocus = (preset: 'all' | 'projects' | 'blocked' | 'goals') => {
+    if (preset === 'all') {
+      handleResetView();
+    } else if (preset === 'projects') {
+      const allTeamIds = teams.map(t => `team-${t.id}`);
+      setExpandedNodeIds(new Set(['core-org', ...allTeamIds]));
+      setSelectedNodeId(null);
+      setFocusNodeId(null);
+    } else if (preset === 'blocked') {
+      setEdgeOverlayFilter('blockers');
+      const blockedTask = tasks.find(t => t.status === 'Blocked');
+      if (blockedTask) {
+        handleSelectNode(`task-${blockedTask.id}`, 'task');
+      }
+    } else if (preset === 'goals') {
+      setEdgeOverlayFilter('okrs');
+      if (goals.length > 0) {
+        handleSelectNode(`goal-${goals[0].id}`, 'goal');
+      }
+    }
+  };
+
+  // Open Full Slide-Over Drawer
+  const handleOpenDetailDrawer = (nodeId?: string, nodeType?: EntityType) => {
+    const targetId = nodeId || selectedNodeId;
+    const targetType = nodeType || selectedNodeType;
+    if (!targetId) return;
+
+    let rawId = targetId;
     if (rawId === 'core-org' || rawId === 'org-core') {
       setActiveScreen('dashboard');
       navigate(`/${currentOrgSlug || 'epicordia'}/dashboard`);
       return;
     }
 
+    if (rawId.startsWith('usr-tasks-')) {
+      const userObj = findUserByAnyId(rawId, users);
+      if (userObj) {
+        pushPanel({ type: 'person', id: userObj.id });
+        return;
+      }
+    }
     if (rawId.startsWith('usr-') || rawId.startsWith('user-')) {
-      rawId = rawId.replace(/^usr-|^user-/, '');
-      if (rawId.includes('-team-')) rawId = rawId.split('-team-')[0];
-      if (rawId.includes('-proj-')) rawId = rawId.split('-proj-')[0];
+      const userObj = findUserByAnyId(rawId, users);
+      if (userObj) {
+        pushPanel({ type: 'person', id: userObj.id });
+        return;
+      }
+      rawId = normalizeEntityId(rawId);
       pushPanel({ type: 'person', id: rawId });
       return;
     }
     if (rawId.startsWith('proj-')) {
-      pushPanel({ type: 'project', id: rawId.replace(/^proj-/, '') });
+      pushPanel({ type: 'project', id: normalizeEntityId(rawId) });
       return;
     }
     if (rawId.startsWith('task-')) {
-      pushPanel({ type: 'task', id: rawId.replace(/^task-/, '') });
+      pushPanel({ type: 'task', id: normalizeEntityId(rawId) });
       return;
     }
     if (rawId.startsWith('goal-')) {
-      pushPanel({ type: 'goal', id: rawId.replace(/^goal-/, '') });
+      pushPanel({ type: 'goal', id: normalizeEntityId(rawId) });
       return;
     }
     if (rawId.startsWith('tag-')) {
-      pushPanel({ type: 'tag', id: rawId.replace(/^tag-/, '') });
+      pushPanel({ type: 'tag', id: normalizeEntityId(rawId) });
       return;
     }
     if (rawId.startsWith('team-')) {
-      const cleanTeamId = rawId.replace(/^team-/, '');
-      const t = teams.find(team => team.id === cleanTeamId || team.id === rawId);
+      const cleanTeamId = normalizeEntityId(rawId);
+      const t = teams.find(team => team.id === cleanTeamId || team.id === rawId || normalizeEntityId(team.id) === cleanTeamId);
       if (t?.leadId) pushPanel({ type: 'person', id: t.leadId });
       else {
         setActiveScreen('team');
@@ -95,144 +192,248 @@ export const RelationshipsScreen: React.FC = () => {
       return;
     }
 
-    // Direct multi-collection lookups
-    if (selectedNodeType === 'task' || tasks.some(t => t.id === rawId)) {
-      const t = tasks.find(tsk => tsk.id === rawId);
-      if (t) { pushPanel({ type: 'task', id: t.id }); return; }
-    }
-    if (selectedNodeType === 'project' || projects.some(p => p.id === rawId)) {
-      const p = projects.find(prj => prj.id === rawId);
-      if (p) { pushPanel({ type: 'project', id: p.id }); return; }
-    }
-    if (selectedNodeType === 'person' || users.some(u => u.id === rawId)) {
-      const u = users.find(usr => usr.id === rawId);
-      if (u) { pushPanel({ type: 'person', id: u.id }); return; }
-    }
-    if (selectedNodeType === 'goal' || goals.some(g => g.id === rawId)) {
-      const g = goals.find(gl => gl.id === rawId);
-      if (g) { pushPanel({ type: 'goal', id: g.id }); return; }
-    }
-    if (selectedNodeType === 'tag' || tags.some(tg => tg.id === rawId)) {
-      const tg = tags.find(tag => tag.id === rawId);
-      if (tg) { pushPanel({ type: 'tag', id: tg.id }); return; }
-    }
-    if (selectedNodeType === 'team' || teams.some(tm => tm.id === rawId)) {
-      const tm = teams.find(team => team.id === rawId);
-      if (tm?.leadId) { pushPanel({ type: 'person', id: tm.leadId }); return; }
-      setActiveScreen('team');
-      navigate(`/${currentOrgSlug || 'epicordia'}/team`);
-      return;
-    }
-
-    if (projects.length > 0) {
+    if (targetType === 'project') pushPanel({ type: 'project', id: rawId });
+    else if (targetType === 'person') pushPanel({ type: 'person', id: rawId });
+    else if (targetType === 'task') pushPanel({ type: 'task', id: rawId });
+    else if (targetType === 'goal') pushPanel({ type: 'goal', id: rawId });
+    else if (projects.length > 0) {
       pushPanel({ type: 'project', id: projects[0].id });
     }
   };
 
-  const handlePresetFocus = (preset: 'all' | 'projects' | 'blocked' | 'goals') => {
-    if (preset === 'all') {
-      setSelectedNodeId(null);
-      setSelectedNodeType(null);
-    } else if (preset === 'projects') {
-      if (projects.length > 0) {
-        const pId = projects[0].id;
-        setSelectedNodeId(`proj-${pId}`);
-        setSelectedNodeType('project');
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${pId}`])));
+  // Interactive Breadcrumbs Calculation
+  const breadcrumbs = useMemo(() => {
+    const orgName = currentOrgSlug 
+      ? currentOrgSlug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+      : 'Workspace';
+
+    const crumbs: Array<{ label: string; id: string | null; icon?: React.ReactNode }> = [
+      { label: orgName, id: 'core-org', icon: <Building2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> }
+    ];
+
+    if (!selectedNodeId || selectedNodeId === 'core-org') return crumbs;
+
+    let targetId = selectedNodeId;
+
+    if (targetId.startsWith('usr-tasks-')) {
+      const userObj = findUserByAnyId(targetId, users);
+      if (userObj) {
+        const teamObj = teams.find(t => t.id === userObj.teamId || normalizeEntityId(t.id) === normalizeEntityId(userObj.teamId));
+        if (teamObj) {
+          crumbs.push({ label: teamObj.name, id: `team-${teamObj.id}`, icon: <Users className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+        }
+        crumbs.push({ label: userObj.name, id: `usr-${userObj.id}`, icon: <UserIcon className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+        crumbs.push({ label: 'Assigned Tasks', id: targetId, icon: <CheckSquare className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
       }
-    } else if (preset === 'blocked') {
-      const blockedTask = tasks.find(t => t.status === 'Blocked');
-      if (blockedTask) {
-        setSelectedNodeId(`task-${blockedTask.id}`);
-        setSelectedNodeType('task');
-        setExpandedFolderIds(prev => Array.from(new Set([...prev, `proj-${blockedTask.projectId}`])));
+    } else if (targetId.startsWith('team-')) {
+      const tId = normalizeEntityId(targetId);
+      const teamObj = teams.find(t => t.id === tId || normalizeEntityId(t.id) === tId);
+      if (teamObj) {
+        crumbs.push({ label: teamObj.name, id: `team-${teamObj.id}`, icon: <Users className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
       }
-    } else if (preset === 'goals') {
-      if (goals.length > 0) {
-        setSelectedNodeId(`goal-${goals[0].id}`);
-        setSelectedNodeType('goal');
+    } else if (targetId.startsWith('proj-')) {
+      const pId = normalizeEntityId(targetId);
+      const projObj = projects.find(p => p.id === pId || normalizeEntityId(p.id) === pId);
+      if (projObj) {
+        const teamObj = teams.find(t => (projObj.teamIds || [projObj.teamId]).some(tid => tid === t.id || normalizeEntityId(tid) === normalizeEntityId(t.id)));
+        if (teamObj) {
+          crumbs.push({ label: teamObj.name, id: `team-${teamObj.id}`, icon: <Users className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+        }
+        crumbs.push({ label: projObj.name, id: `proj-${projObj.id}`, icon: <Briefcase className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
       }
+    } else if (targetId.startsWith('task-')) {
+      const tId = normalizeEntityId(targetId);
+      const taskObj = tasks.find(t => t.id === tId || normalizeEntityId(t.id) === tId);
+      if (taskObj) {
+        const projObj = projects.find(p => p.id === taskObj.projectId || normalizeEntityId(p.id) === normalizeEntityId(taskObj.projectId));
+        if (projObj) {
+          const teamObj = teams.find(t => (projObj.teamIds || [projObj.teamId]).some(tid => tid === t.id || normalizeEntityId(tid) === normalizeEntityId(t.id)));
+          if (teamObj) {
+            crumbs.push({ label: teamObj.name, id: `team-${teamObj.id}`, icon: <Users className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+          }
+          crumbs.push({ label: projObj.name, id: `proj-${projObj.id}`, icon: <Briefcase className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+        }
+        crumbs.push({ label: taskObj.title, id: `task-${taskObj.id}`, icon: <CheckSquare className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+      }
+    } else if (targetId.startsWith('usr-') || targetId.startsWith('user-')) {
+      const userObj = findUserByAnyId(targetId, users);
+      if (userObj) {
+        const teamObj = teams.find(t => t.id === userObj.teamId || normalizeEntityId(t.id) === normalizeEntityId(userObj.teamId));
+        if (teamObj) {
+          crumbs.push({ label: teamObj.name, id: `team-${teamObj.id}`, icon: <Users className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+        }
+        crumbs.push({ label: userObj.name, id: targetId, icon: <UserIcon className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+      }
+    } else if (targetId.startsWith('goal-')) {
+      const gId = targetId.replace('goal-', '');
+      const goalObj = goals.find(g => g.id === gId);
+      if (goalObj) {
+        crumbs.push({ label: goalObj.title, id: `goal-${goalObj.id}`, icon: <Target className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" /> });
+      }
+    }
+
+    return crumbs;
+  }, [selectedNodeId, currentOrgSlug, teams, projects, tasks, users, goals]);
+
+  // Search auto-focus handler
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (!val.trim()) return;
+
+    const lower = val.toLowerCase();
+    const matchedUser = users.find(u => u.name.toLowerCase().includes(lower));
+    if (matchedUser) {
+      handleSelectNode(`usr-${matchedUser.id}`, 'person');
+      return;
+    }
+
+    const matchedTask = tasks.find(t => t.title.toLowerCase().includes(lower));
+    if (matchedTask) {
+      handleSelectNode(`task-${matchedTask.id}`, 'task');
+      return;
+    }
+
+    const matchedProj = projects.find(p => p.name.toLowerCase().includes(lower));
+    if (matchedProj) {
+      handleSelectNode(`proj-${matchedProj.id}`, 'project');
+      return;
+    }
+
+    const matchedTeam = teams.find(t => t.name.toLowerCase().includes(lower));
+    if (matchedTeam) {
+      handleSelectNode(`team-${matchedTeam.id}`, 'team');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 w-screen h-screen bg-[#F4F5F7] dark:bg-neutral-950 flex flex-col font-sans overflow-hidden">
-      {/* Top Header Bar with Prominent Back to Dashboard Button */}
-      <div className="h-14 px-4 sm:px-6 bg-white/90 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4 shrink-0 font-mono text-xs text-neutral-900 dark:text-neutral-100 backdrop-blur-md">
-        {/* Left: Back Button & Breadcrumbs */}
-        <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar">
+    <div className="fixed inset-0 z-50 w-screen h-screen bg-[#F4F5F7] dark:bg-[#0F1115] flex flex-col font-sans overflow-hidden">
+      {/* Top Header Bar */}
+      <div className="h-13 px-4 sm:px-6 bg-white dark:bg-[#1A1D24] border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4 shrink-0 font-mono text-xs text-neutral-900 dark:text-neutral-100 z-40">
+        {/* Left: Back Button & Synced Interactive Breadcrumbs */}
+        <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar">
           <button
             onClick={() => {
               setActiveScreen('dashboard');
               navigate(`/${currentOrgSlug || 'epicordia'}/dashboard`);
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold hover:opacity-90 transition-opacity shadow-sm shrink-0"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-mono text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm shrink-0"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>Dashboard</span>
           </button>
 
           <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
 
-          <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white shrink-0">
-            <Network className="w-3.5 h-3.5 text-neutral-400" />
-            <span>Spider Web Relationships</span>
+          {/* Breadcrumb Trail */}
+          <div className="flex items-center gap-1 shrink-0">
+            {breadcrumbs.map((crumb, idx) => (
+              <React.Fragment key={crumb.id || idx}>
+                {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />}
+                <button
+                  onClick={() => {
+                    if (crumb.id) handleSelectNode(crumb.id);
+                  }}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors truncate max-w-[160px] ${
+                    idx === breadcrumbs.length - 1
+                      ? 'bg-neutral-100 dark:bg-neutral-800 font-semibold text-neutral-900 dark:text-neutral-100'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  }`}
+                  title={crumb.label}
+                >
+                  {crumb.icon}
+                  <span className="truncate">{crumb.label}</span>
+                </button>
+              </React.Fragment>
+            ))}
+
+            {/* 1-Click Reset to Org Hierarchy */}
+            {selectedNodeId && (
+              <button
+                onClick={handleResetView}
+                className="flex items-center gap-1 px-2 py-1 ml-1 rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 font-mono text-[10px] font-medium transition-all"
+                title="Collapse drill-downs and reset to Organization Overview"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-
-          <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold truncate max-w-[200px]">
-            {selectedNodeId ? selectedNodeId : 'Concentric Radial Map'}
-          </span>
         </div>
 
-        {/* Middle: Search Input */}
-        <div className="relative hidden md:block max-w-xs w-full">
-          <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search relationship nodes..."
-            className="w-full pl-8 pr-4 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
-          />
+        {/* View Mode Toggle: Carousel vs Hexagon Grid */}
+        <div className="flex items-center bg-neutral-100 dark:bg-neutral-800/80 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-xs shrink-0">
+          <button
+            onClick={() => setViewMode('carousel')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium text-xs transition-all ${
+              viewMode === 'carousel'
+                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5 opacity-70" />
+            <span>Master-Detail</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('spiderweb')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium text-xs transition-all ${
+              viewMode === 'spiderweb'
+                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100'
+            }`}
+          >
+            <Hexagon className="w-3.5 h-3.5 opacity-70" />
+            <span>Hexagon Grid</span>
+          </button>
         </div>
 
-        {/* Right Action Shortcuts */}
+        {/* Search & Presets */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden lg:flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-1 rounded-xl">
+          <div className="relative hidden md:block w-44 lg:w-56">
+            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Search..."
+              className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 transition-all placeholder:text-neutral-400 font-mono"
+            />
+          </div>
+
+          <div className="hidden xl:flex items-center gap-0.5 bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 p-0.5 rounded-lg">
             <button
               onClick={() => handlePresetFocus('all')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold"
+              className="px-2 py-0.5 rounded text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-white dark:hover:bg-neutral-700 transition-all font-medium"
             >
               All
             </button>
             <button
               onClick={() => handlePresetFocus('projects')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold"
+              className="px-2 py-0.5 rounded text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-white dark:hover:bg-neutral-700 transition-all font-medium"
             >
               Projects
             </button>
             <button
               onClick={() => handlePresetFocus('blocked')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-red-600 dark:text-red-400 hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold flex items-center gap-1"
+              className="px-2 py-0.5 rounded text-[10px] text-neutral-700 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-700 transition-all font-medium flex items-center gap-1"
             >
-              <ShieldAlert className="w-3 h-3" /> Blockers
+              <ShieldAlert className="w-3 h-3 text-neutral-500" /> Blockers
             </button>
             <button
               onClick={() => handlePresetFocus('goals')}
-              className="px-2.5 py-1 rounded-lg text-[10px] text-purple-600 dark:text-purple-400 hover:bg-white dark:hover:bg-neutral-700 transition-all font-bold flex items-center gap-1"
+              className="px-2 py-0.5 rounded text-[10px] text-neutral-700 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-700 transition-all font-medium flex items-center gap-1"
             >
-              <Target className="w-3 h-3" /> OKRs
+              <Target className="w-3 h-3 text-neutral-500" /> Goals
             </button>
           </div>
 
           {selectedNodeId && (
             <button
-              onClick={handleOpenDetailDrawer}
-              className="px-3.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 shadow-xs"
+              onClick={() => handleOpenDetailDrawer()}
+              className="px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-mono text-xs font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 shadow-xs"
             >
-              <span>Inspect Entity</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Inspect</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </button>
           )}
         </div>
@@ -240,30 +441,53 @@ export const RelationshipsScreen: React.FC = () => {
 
       {/* Main Split Viewport */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        {/* Left Side: Animated Hierarchy Explorer */}
         <StackedFolderSidebar
           selectedNodeId={selectedNodeId}
           onSelectNode={(id, type) => handleSelectNode(id, type, false)}
-          expandedFolderIds={expandedFolderIds}
-          onToggleFolder={handleToggleFolder}
+          expandedFolderIds={Array.from(expandedNodeIds)}
+          onToggleFolder={handleToggleExpandNode}
           isCollapsed={isFolderSidebarCollapsed}
           onToggleCollapse={() => setIsFolderSidebarCollapsed(prev => !prev)}
         />
 
-        <SpiderWebCanvas
-          selectedNodeId={selectedNodeId}
-          onSelectNode={(id, type) => handleSelectNode(id, type, true)}
-          searchQuery={searchQuery}
-        />
+        {/* Right Side: Conditional View Rendering */}
+        {viewMode === 'carousel' ? (
+          <RelationshipCarousel
+            selectedNodeId={selectedNodeId}
+            selectedNodeType={selectedNodeType}
+            onSelectNode={(id, type) => handleSelectNode(id, type)}
+            onDrillDown={handleDrillDown}
+            onOpenDrawer={handleOpenDetailDrawer}
+            searchQuery={searchQuery}
+          />
+        ) : (
+          <>
+            <SpiderWebCanvas
+              selectedNodeId={selectedNodeId}
+              onSelectNode={(id, type) => handleSelectNode(id, type, true)}
+              expandedNodeIds={expandedNodeIds}
+              onToggleExpandNode={handleToggleExpandNode}
+              focusNodeId={focusNodeId}
+              focusDepth={focusDepth}
+              onSetFocusDepth={setFocusDepth}
+              edgeOverlayFilter={edgeOverlayFilter}
+              onSetEdgeOverlayFilter={setEdgeOverlayFilter}
+              searchQuery={searchQuery}
+            />
 
-        {/* Floating Bottom-Right Detail Info Popup Card */}
-        <NodeDetailPopupCard
-          selectedNodeId={selectedNodeId}
-          selectedNodeType={selectedNodeType}
-          onClose={() => {
-            setSelectedNodeId(null);
-            setSelectedNodeType(null);
-          }}
-        />
+            {/* Floating Detail Popup in Spiderweb mode */}
+            <NodeDetailPopupCard
+              selectedNodeId={selectedNodeId}
+              selectedNodeType={selectedNodeType}
+              onClose={() => {
+                setSelectedNodeId(null);
+                setSelectedNodeType(null);
+                setFocusNodeId(null);
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );

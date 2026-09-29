@@ -31,7 +31,7 @@ export const SupportModal: React.FC = () => {
             <BookOpen className="w-5 h-5 text-neutral-700 dark:text-neutral-300 shrink-0 mt-0.5" />
             <div>
               <div className="font-bold text-neutral-900 dark:text-neutral-100">Knowledge Base & Guides</div>
-              <p className="text-neutral-500 text-[11px] mt-0.5">Learn how to configure workflows, set up OKR rollups, and manage tag swatches in Pulse by Epicordia.</p>
+              <p className="text-neutral-500 text-[11px] mt-0.5">Learn how to configure workflows, set up goal rollups, and manage tag swatches in Pulse by Epicordia.</p>
             </div>
           </div>
 

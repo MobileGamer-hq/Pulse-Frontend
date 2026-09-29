@@ -58,7 +58,7 @@ export const GoalsScreen: React.FC = () => {
   React.useEffect(() => {
     const mapped = goals.map(g => ({
       id: g.id,
-      dept: g.ownerType === 'team' ? 'Engineering' : 'Org',
+      dept: g.ownerType === 'team' ? 'Engineering' : 'Organization',
       quarter: 'Current Quarter',
       title: g.title,
       owner: g.ownerName,
@@ -123,7 +123,7 @@ export const GoalsScreen: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Strategic Objectives</h1>
-              <p className="text-xs text-neutral-500 font-mono mt-0.5">Strategic OKRs &amp; Key Results</p>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Strategic Goals &amp; Key Results</p>
             </div>
 
             <div className="flex items-center gap-3 font-mono">
@@ -158,7 +158,7 @@ export const GoalsScreen: React.FC = () => {
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="px-3.5 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 cursor-pointer shadow-xs"
-                title="Sync goals with database"
+                title="Refresh goals"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
                 <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
@@ -182,7 +182,7 @@ export const GoalsScreen: React.FC = () => {
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">No Strategic Objectives Found</h3>
                 <p className="text-xs text-neutral-500 font-mono max-w-sm mx-auto">
-                  Your workspace currently has 0 goals tracked in the database. Click below to create your first goal.
+                  Your workspace currently has 0 goals tracked. Click below to create your first goal.
                 </p>
               </div>
               <button

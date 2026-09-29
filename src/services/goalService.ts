@@ -71,7 +71,7 @@ export const goalService = {
 
     if (error) {
       console.error('[goalService.createGoal] Supabase error:', error);
-      throw new Error(error.message || 'Failed to create goal in database.');
+      throw new Error(error.message || 'Failed to create goal.');
     }
 
     if (payload.keyResults && payload.keyResults.length > 0) {

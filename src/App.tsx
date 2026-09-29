@@ -8,6 +8,7 @@ import { RolePrivilegesModal } from './components/common/RolePrivilegesModal';
 import { CreateItemModal, type ItemType } from './components/common/CreateItemModal';
 import { DashboardScreen } from './components/dashboard/DashboardScreen';
 import { TasksScreen } from './components/tasks/TasksScreen';
+import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { DailyPulseScreen } from './components/pulse/DailyPulseScreen';
 import { ProjectsScreen } from './components/projects/ProjectsScreen';
 import { GoalsScreen } from './components/goals/GoalsScreen';
@@ -50,6 +51,7 @@ const OrgRouteSync: React.FC = () => {
     let targetScreen = screen || 'dashboard';
     const path = location.pathname.toLowerCase();
     if (path.includes('/tasks')) targetScreen = 'tasks';
+    else if (path.includes('/schedule')) targetScreen = 'schedule';
     else if (path.includes('/projects')) targetScreen = 'projects';
     else if (path.includes('/pulse')) targetScreen = 'pulse';
     else if (path.includes('/relationships') || path.includes('/spiderweb-relationships') || path.includes('/lab-relationships')) targetScreen = 'relationships';
@@ -128,6 +130,7 @@ const MainLayout: React.FC = () => {
             {activeScreen === 'dashboard' && <DashboardScreen />}
             {(activeScreen === 'relationships' || activeScreen === 'lab-relationships' || activeScreen === 'spiderweb-relationships') && <RelationshipsScreen />}
             {activeScreen === 'tasks' && <TasksScreen />}
+            {activeScreen === 'schedule' && <ScheduleScreen />}
             {activeScreen === 'pulse' && <DailyPulseScreen />}
             {activeScreen === 'projects' && <ProjectsScreen />}
             {activeScreen === 'goals' && <GoalsScreen />}
@@ -245,6 +248,7 @@ export default function App() {
               <Route path="dashboard" element={null} />
               <Route path="tasks" element={null} />
               <Route path="tasks/:taskId" element={null} />
+              <Route path="schedule" element={null} />
               <Route path="pulse" element={null} />
               <Route path="relationships" element={null} />
               <Route path="spiderweb-relationships" element={null} />

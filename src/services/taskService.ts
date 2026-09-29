@@ -120,7 +120,7 @@ export const taskService = {
 
     if (taskError) {
       console.error('[taskService.createTask] Supabase task error:', taskError);
-      throw new Error(taskError.message || 'Failed to create task in database.');
+      throw new Error(taskError.message || 'Failed to create task.');
     }
 
     // Persist subtasks to Supabase

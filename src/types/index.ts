@@ -37,6 +37,7 @@ export interface User {
   teamName: string;
   title: string;
   avatarUrl?: string;
+  avatarColor?: string;
   isContractor?: boolean;
   activeProjectIds: string[];
   capacityHoursPerWeek: number;
@@ -245,4 +246,29 @@ export interface Notification {
   };
 }
 
+export interface WorkloadSettings {
+  standardWeeklyHours: number; // e.g. 40
+  optimalMinHours: number; // e.g. 20
+  optimalMaxHours: number; // e.g. 40
+  overbookedHoursThreshold: number; // e.g. 40
+  maxActiveTasks: number; // e.g. 5
+  defaultTaskEstimatedHours: number; // e.g. 4
+  underbookedLabel: string; // e.g. "Underutilized" / "Available"
+  optimalLabel: string; // e.g. "Optimal"
+  overbookedLabel: string; // e.g. "Overbooked"
+}
+
+export const DEFAULT_WORKLOAD_SETTINGS: WorkloadSettings = {
+  standardWeeklyHours: 40,
+  optimalMinHours: 20,
+  optimalMaxHours: 40,
+  overbookedHoursThreshold: 40,
+  maxActiveTasks: 5,
+  defaultTaskEstimatedHours: 4,
+  underbookedLabel: 'Underutilized',
+  optimalLabel: 'Optimal',
+  overbookedLabel: 'Overbooked',
+};
+
 export type { AnalyticsData } from '../services/analyticsService';
+export * from './schedule';

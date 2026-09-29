@@ -8,10 +8,16 @@ import {
 import type { Team, WorkflowTemplate, User } from '../../types';
 
 export const TeamScreen: React.FC = () => {
-  const { users, teams, updateTeam, deleteTeam, removeMemberFromTeam, removeMemberFromOrg, pushPanel, refreshWorkspaceData, currentOrgName } = useApp();
+  const { 
+    users, teams, updateTeam, deleteTeam, removeMemberFromTeam, removeMemberFromOrg, 
+    pushPanel, refreshWorkspaceData, currentOrgName, activeRole, currentUser 
+  } = useApp();
   const [selectedTeamId, setSelectedTeamId] = useState<string | 'all'>('all');
   const [memberQuery, setMemberQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // RBAC Permission Guard: Only Admins, Managers, and HR can create/edit teams or assign/reassign members
+  const canManageTeams = ['Admin', 'Manager', 'HR'].includes(activeRole || currentUser?.role || '');
 
   // Modal State for Removing Member from Organization
   const [orgUserToRemove, setOrgUserToRemove] = useState<User | null>(null);
@@ -62,6 +68,10 @@ export const TeamScreen: React.FC = () => {
   );
 
   const handleStartEditTeam = (team: Team) => {
+    if (!canManageTeams) {
+      alert('Permission Denied: Only Admins and Managers have privilege to edit team configurations.');
+      return;
+    }
     setEditingTeam(team);
     setEditName(team.name);
     setEditTemplate((team.workflowTemplate as WorkflowTemplate) || 'SoftwareSprint');
@@ -76,6 +86,7 @@ export const TeamScreen: React.FC = () => {
 
   const handleSaveTeamEdit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageTeams) return;
     if (!editingTeam || !editName.trim()) return;
 
     const leadUser = users.find(u => u.id === editLeadId);
@@ -93,6 +104,10 @@ export const TeamScreen: React.FC = () => {
   };
 
   const handleOpenManageMembers = (team: Team) => {
+    if (!canManageTeams) {
+      alert('Permission Denied: Only Admins and Managers have privilege to assign or manage team rosters.');
+      return;
+    }
     setManagingTeam(team);
     const currentMemberIds = users
       .filter(u => (team.memberIds || []).includes(u.id) || u.teamId === team.id || (team.leadId && team.leadId === u.id))
@@ -104,7 +119,7 @@ export const TeamScreen: React.FC = () => {
 
   const handleSaveManageMembers = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!managingTeam) return;
+    if (!canManageTeams || !managingTeam) return;
 
     const finalMemberIds = Array.from(new Set(managingTeam.leadId ? [managingTeam.leadId, ...selectedMemberIds] : selectedMemberIds));
     await updateTeam(managingTeam.id, {
@@ -116,6 +131,10 @@ export const TeamScreen: React.FC = () => {
   };
 
   const handleRemoveMemberFromCurrentTeam = async (userToRemove: User) => {
+    if (!canManageTeams) {
+      alert('Permission Denied: Only Admins and Managers can remove members from teams.');
+      return;
+    }
     if (!selectedTeam) return;
     if (selectedTeam.leadId === userToRemove.id) {
       alert(`${userToRemove.name} is the Team Lead. To remove them, please assign a new Team Lead first in Edit Team Info.`);
@@ -128,6 +147,10 @@ export const TeamScreen: React.FC = () => {
   };
 
   const handleRemoveMemberFromSpecificTeam = async (teamId: string, userToRemove: User) => {
+    if (!canManageTeams) {
+      alert('Permission Denied: Only Admins and Managers can remove members from teams.');
+      return;
+    }
     const target = teams.find(t => t.id === teamId);
     const tName = target ? target.name : 'this team';
     if (window.confirm(`Are you sure you want to remove ${userToRemove.name} from team "${tName}"?`)) {
@@ -136,6 +159,7 @@ export const TeamScreen: React.FC = () => {
   };
 
   const handleConfirmRemoveFromOrg = async () => {
+    if (!canManageTeams) return;
     if (!orgUserToRemove) return;
     await removeMemberFromOrg(orgUserToRemove.id);
     setOrgUserToRemove(null);
@@ -143,6 +167,10 @@ export const TeamScreen: React.FC = () => {
 
   const handleSaveAssignUserToTeam = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageTeams) {
+      alert('Permission Denied: Only Admins and Managers have privilege to assign teams.');
+      return;
+    }
     if (!assigningUser || !targetTeamId) return;
 
     const targetTeam = teams.find(t => t.id === targetTeamId);
@@ -164,6 +192,7 @@ export const TeamScreen: React.FC = () => {
   };
 
   const handleDeleteTeamConfirm = (teamId: string) => {
+    if (!canManageTeams) return;
     deleteTeam(teamId);
     if (selectedTeamId === teamId) {
       setSelectedTeamId('all');
@@ -177,7 +206,7 @@ export const TeamScreen: React.FC = () => {
     { id: 'MarketingLaunch', label: 'Marketing Campaign Launch' },
     { id: 'SalesPipeline', label: 'Sales & Revenue Pipeline' },
     { id: 'DesignSystem', label: 'Design System Iteration' },
-    { id: 'ExecutiveStrategy', label: 'Executive Strategy & OKRs' },
+    { id: 'ExecutiveStrategy', label: 'Executive Strategy & Goals' },
     { id: 'GeneralOps', label: 'General Operations' },
   ];
 
@@ -197,27 +226,31 @@ export const TeamScreen: React.FC = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3.5 py-2 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-60"
-            title="Sync latest roster and teams from database"
+            title="Refresh roster and teams"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'team' } }))}
-            className="px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Create Team
-          </button>
+          {canManageTeams && (
+            <>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'team' } }))}
+                className="px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-700 font-mono text-xs font-bold rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Create Team
+              </button>
 
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'member' } }))}
-            className="px-3.5 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            Invite Member
-          </button>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'member' } }))}
+                className="px-3.5 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                Invite Member
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -290,7 +323,7 @@ export const TeamScreen: React.FC = () => {
                     <Layers className="w-4 h-4" />
                   </div>
 
-                  <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
                       isSelected
                         ? 'bg-white/20 dark:bg-black/20 text-white dark:text-black'
@@ -299,21 +332,23 @@ export const TeamScreen: React.FC = () => {
                       {mCount} {mCount === 1 ? 'member' : 'members'}
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartEditTeam(t);
-                      }}
-                      className={`p-1 rounded-lg transition-colors ${
-                        isSelected
-                          ? 'hover:bg-white/20 dark:hover:bg-black/20 text-white dark:text-black'
-                          : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
-                      }`}
-                      title="Edit Team Settings"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
+                    {canManageTeams && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEditTeam(t);
+                        }}
+                        className={`p-1 rounded-lg transition-colors ${
+                          isSelected
+                            ? 'hover:bg-white/20 dark:hover:bg-black/20 text-white dark:text-black'
+                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+                        }`}
+                        title="Edit Team Settings"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -356,7 +391,7 @@ export const TeamScreen: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 text-xs flex-wrap">
-            {selectedTeam && (
+            {selectedTeam && canManageTeams && (
               <>
                 <button
                   onClick={() => handleOpenManageMembers(selectedTeam)}
@@ -414,7 +449,7 @@ export const TeamScreen: React.FC = () => {
               />
             </div>
 
-            {selectedTeam && (
+            {selectedTeam && canManageTeams && (
               <button
                 onClick={() => handleOpenManageMembers(selectedTeam)}
                 className="px-3 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-mono text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
@@ -455,22 +490,24 @@ export const TeamScreen: React.FC = () => {
                       </p>
                     </div>
 
-                    {selectedTeam ? (
-                      <button
-                        onClick={() => handleOpenManageMembers(selectedTeam)}
-                        className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        + Add Members to {selectedTeam.name}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'member' } }))}
-                        className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Invite Workspace Member
-                      </button>
+                    {canManageTeams && (
+                      selectedTeam ? (
+                        <button
+                          onClick={() => handleOpenManageMembers(selectedTeam)}
+                          className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          + Add Members to {selectedTeam.name}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'member' } }))}
+                          className="mt-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          Invite Workspace Member
+                        </button>
+                      )
                     )}
                   </td>
                 </tr>
@@ -528,17 +565,19 @@ export const TeamScreen: React.FC = () => {
                                 >
                                   {t.name}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveMemberFromSpecificTeam(t.id, m);
-                                  }}
-                                  className="opacity-40 group-hover/pill:opacity-100 hover:text-red-500 transition-opacity cursor-pointer p-0.5"
-                                  title={`Remove ${m.name} from ${t.name}`}
-                                >
-                                  <X className="w-2.5 h-2.5" />
-                                </button>
+                                {canManageTeams && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveMemberFromSpecificTeam(t.id, m);
+                                    }}
+                                    className="opacity-40 group-hover/pill:opacity-100 hover:text-red-500 transition-opacity cursor-pointer p-0.5"
+                                    title={`Remove ${m.name} from ${t.name}`}
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                )}
                               </span>
                             ))
                           ) : (
@@ -565,7 +604,7 @@ export const TeamScreen: React.FC = () => {
                                 <Eye className="w-4 h-4" />
                               </button>
 
-                              {!isLeadOfSelected && (
+                              {canManageTeams && !isLeadOfSelected && (
                                 <button
                                   onClick={() => handleRemoveMemberFromCurrentTeam(m)}
                                   className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
@@ -575,27 +614,31 @@ export const TeamScreen: React.FC = () => {
                                 </button>
                               )}
 
-                              <button
-                                onClick={() => setOrgUserToRemove(m)}
-                                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                                title={`Remove ${m.name} from organization`}
-                              >
-                                <UserX className="w-4 h-4" />
-                              </button>
+                              {canManageTeams && (
+                                <button
+                                  onClick={() => setOrgUserToRemove(m)}
+                                  className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                  title={`Remove ${m.name} from organization`}
+                                >
+                                  <UserX className="w-4 h-4" />
+                                </button>
+                              )}
                             </>
                           ) : (
                             <>
-                              <button
-                                onClick={() => {
-                                  setAssigningUser(m);
-                                  setTargetTeamId(teams[0]?.id || '');
-                                }}
-                                className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                                title="Assign to team"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Assign Team
-                              </button>
+                              {canManageTeams && (
+                                <button
+                                  onClick={() => {
+                                    setAssigningUser(m);
+                                    setTargetTeamId(teams[0]?.id || '');
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Assign to team"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Assign Team
+                                </button>
+                              )}
 
                               <button
                                 onClick={() => pushPanel({ type: 'person', id: m.id })}
@@ -605,13 +648,15 @@ export const TeamScreen: React.FC = () => {
                                 <Eye className="w-4 h-4" />
                               </button>
 
-                              <button
-                                onClick={() => setOrgUserToRemove(m)}
-                                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                                title={`Remove ${m.name} from organization`}
-                              >
-                                <UserX className="w-4 h-4" />
-                              </button>
+                              {canManageTeams && (
+                                <button
+                                  onClick={() => setOrgUserToRemove(m)}
+                                  className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                  title={`Remove ${m.name} from organization`}
+                                >
+                                  <UserX className="w-4 h-4" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

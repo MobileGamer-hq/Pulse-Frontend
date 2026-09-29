@@ -2,29 +2,72 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { StackedFolderSidebar } from './StackedFolderSidebar';
-import { SpiderWebCanvas } from './SpiderWebCanvas';
+import { SpiderWebCanvas, type EdgeOverlayFilter } from './SpiderWebCanvas';
+import { RelationshipCarousel } from './RelationshipCarousel';
 import { NodeDetailPopupCard } from './NodeDetailPopupCard';
-import { ArrowLeft, Search, Plus, Network } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Hexagon, LayoutGrid, RotateCcw } from 'lucide-react';
 import type { EntityType } from '../../types';
 
 export const SpiderWebRelationshipsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { setActiveScreen, currentOrgSlug } = useApp();
+  const { setActiveScreen, currentOrgSlug, pushPanel } = useApp();
+  
+  const [viewMode, setViewMode] = useState<'spiderweb' | 'carousel'>('spiderweb');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeType, setSelectedNodeType] = useState<EntityType | null>(null);
-  const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>(['team-eng', 'team-design', 'proj-1', 'proj-2']);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => new Set(['core-org']));
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [focusDepth, setFocusDepth] = useState<number>(2);
+  const [edgeOverlayFilter, setEdgeOverlayFilter] = useState<EdgeOverlayFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleSelectNode = (id: string, type?: EntityType) => {
     setSelectedNodeId(id);
+    setFocusNodeId(id);
     if (type) setSelectedNodeType(type);
   };
 
-  const handleToggleFolder = (folderId: string) => {
-    setExpandedFolderIds(prev => 
-      prev.includes(folderId) ? prev.filter(id => id !== folderId) : [...prev, folderId]
-    );
+  const handleDrillDown = (id: string, type: EntityType) => {
+    setExpandedNodeIds(prev => new Set([...prev, id]));
+    handleSelectNode(id, type);
+  };
+
+  const handleToggleExpandNode = (nodeId: string) => {
+    setExpandedNodeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  };
+
+  const handleResetView = () => {
+    setExpandedNodeIds(new Set(['core-org']));
+    setSelectedNodeId(null);
+    setSelectedNodeType(null);
+    setFocusNodeId(null);
+    setSearchQuery('');
+  };
+
+  const handleOpenDetailDrawer = (nodeId?: string, nodeType?: EntityType) => {
+    const targetId = nodeId || selectedNodeId;
+    const targetType = nodeType || selectedNodeType;
+    if (!targetId) return;
+
+    let rawId = targetId;
+    if (rawId.startsWith('usr-') || rawId.startsWith('user-')) {
+      rawId = rawId.replace(/^usr-|^user-/, '').split('-team-')[0].split('-proj-')[0];
+      pushPanel({ type: 'person', id: rawId });
+    } else if (rawId.startsWith('proj-')) {
+      pushPanel({ type: 'project', id: rawId.replace(/^proj-/, '') });
+    } else if (rawId.startsWith('task-')) {
+      pushPanel({ type: 'task', id: rawId.replace(/^task-/, '') });
+    } else if (rawId.startsWith('goal-')) {
+      pushPanel({ type: 'goal', id: rawId.replace(/^goal-/, '') });
+    } else if (targetType) {
+      pushPanel({ type: targetType as any, id: rawId });
+    }
   };
 
   return (
@@ -42,18 +85,33 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
             <span>Dashboard</span>
           </button>
+          
           <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-800" />
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
-            <div>
-              <h1 className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                Spider Web Canvas
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono border border-neutral-200 dark:border-neutral-700">
-                  Version 3 • Concentric Layers
-                </span>
-              </h1>
-              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">Concentric radial rings • Multi-project instances</p>
-            </div>
+          
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-xs">
+            <button
+              onClick={() => setViewMode('carousel')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-bold text-xs transition-all ${
+                viewMode === 'carousel'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-black dark:hover:text-white'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
+              <span>Master-Detail</span>
+            </button>
+            <button
+              onClick={() => setViewMode('spiderweb')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-bold text-xs transition-all ${
+                viewMode === 'spiderweb'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-black dark:hover:text-white'
+              }`}
+            >
+              <Hexagon className="w-3.5 h-3.5 text-amber-500" />
+              <span>Hexagon Grid</span>
+            </button>
           </div>
         </div>
 
@@ -64,13 +122,22 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search nodes or multi-instance members..."
+            placeholder="Search person, project, task..."
             className="w-full bg-transparent text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none font-mono"
           />
         </div>
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
+          {selectedNodeId && (
+            <button
+              onClick={handleResetView}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-xs font-bold transition-all text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 shadow-xs"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset View</span>
+            </button>
+          )}
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('pulse:open-create-item', { detail: { type: 'task' } }))}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black hover:opacity-90 text-xs font-bold transition-all shadow-xs"
@@ -81,38 +148,54 @@ export const SpiderWebRelationshipsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Canvas Body */}
+      {/* Main Viewport */}
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
-        {/* Left Interactive Stacked Folder Sidebar */}
         <StackedFolderSidebar
           selectedNodeId={selectedNodeId}
           onSelectNode={handleSelectNode}
-          expandedFolderIds={expandedFolderIds}
-          onToggleFolder={handleToggleFolder}
+          expandedFolderIds={Array.from(expandedNodeIds)}
+          onToggleFolder={handleToggleExpandNode}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         />
 
-        {/* Spider Web Canvas Viewport */}
-        <div className="flex-1 h-full relative">
-          <SpiderWebCanvas
+        {viewMode === 'carousel' ? (
+          <RelationshipCarousel
             selectedNodeId={selectedNodeId}
-            onSelectNode={handleSelectNode}
+            selectedNodeType={selectedNodeType}
+            onSelectNode={(id, type) => handleSelectNode(id, type)}
+            onDrillDown={handleDrillDown}
+            onOpenDrawer={handleOpenDetailDrawer}
             searchQuery={searchQuery}
           />
-
-          {/* Node Detail Popup Drawer */}
-          {selectedNodeId && (
-            <NodeDetailPopupCard
+        ) : (
+          <div className="flex-1 h-full relative">
+            <SpiderWebCanvas
               selectedNodeId={selectedNodeId}
-              selectedNodeType={selectedNodeType}
-              onClose={() => {
-                setSelectedNodeId(null);
-                setSelectedNodeType(null);
-              }}
+              onSelectNode={handleSelectNode}
+              expandedNodeIds={expandedNodeIds}
+              onToggleExpandNode={handleToggleExpandNode}
+              focusNodeId={focusNodeId}
+              focusDepth={focusDepth}
+              onSetFocusDepth={setFocusDepth}
+              edgeOverlayFilter={edgeOverlayFilter}
+              onSetEdgeOverlayFilter={setEdgeOverlayFilter}
+              searchQuery={searchQuery}
             />
-          )}
-        </div>
+
+            {selectedNodeId && (
+              <NodeDetailPopupCard
+                selectedNodeId={selectedNodeId}
+                selectedNodeType={selectedNodeType}
+                onClose={() => {
+                  setSelectedNodeId(null);
+                  setSelectedNodeType(null);
+                  setFocusNodeId(null);
+                }}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

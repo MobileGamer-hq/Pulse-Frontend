@@ -98,7 +98,7 @@ export const CreateOrgScreen: React.FC = () => {
       navigate(`/${slug}/dashboard`);
     } catch (err: any) {
       console.error('[CreateOrgScreen] Organization creation error:', err);
-      setError(err.message || 'Failed to create organization in database.');
+      setError(err.message || 'Failed to create organization. Please try again.');
       setLoading(false);
     }
   };

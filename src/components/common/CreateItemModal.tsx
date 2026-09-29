@@ -42,8 +42,8 @@ const ENTITY_EXPLANATIONS: Record<ItemType, { subtitle: string; description: str
     ]
   },
   goal: {
-    subtitle: 'High-Level OKR & Strategic Objective',
-    description: 'A strategic goal (Objective and Key Result) defines what the organization aims to achieve over a quarter or annual cycle with measurable key results.',
+    subtitle: 'High-Level Strategic Goal & Objective',
+    description: 'A strategic goal defines what the organization aims to achieve over a quarter or annual cycle with measurable key results.',
     tips: [
       'Set quantifiable Key Results (e.g. percentages, units, currency).',
       'Assign ownership to the organization, a team, or an individual lead.',
@@ -62,7 +62,7 @@ const ENTITY_EXPLANATIONS: Record<ItemType, { subtitle: string; description: str
     subtitle: 'Workspace Teammate Invitation',
     description: 'Invite new collaborators to join your Pulse workspace. Generate secure invitation tokens or shareable invite links with predefined roles and permissions.',
     tips: [
-      'Select appropriate RBAC roles (Admin, Manager, Member, Contractor, etc.).',
+      'Select appropriate roles and permissions (Admin, Manager, Member, Contractor, etc.).',
       'Assigned teams give new members immediate visibility into active projects.'
     ]
   },
@@ -180,7 +180,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           })),
           comments: []
         });
-        setSuccessMessage(`Task "${taskTitle}" saved to database successfully!`);
+        setSuccessMessage(`Task "${taskTitle}" created successfully!`);
       } else if (itemType === 'project') {
         if (!projectName.trim()) {
           setSubmitError('Please enter a project name.');
@@ -202,7 +202,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           targetEndDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
           status: 'Active'
         });
-        setSuccessMessage(`Project "${projectName}" saved to database successfully!`);
+        setSuccessMessage(`Project "${projectName}" created successfully!`);
       } else if (itemType === 'goal') {
         if (!goalTitle.trim()) {
           setSubmitError('Please enter a goal title.');
@@ -224,7 +224,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           targetDate: goalTargetDate || new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0],
           status: 'OnTrack'
         });
-        setSuccessMessage(`Goal "${goalTitle}" saved to database successfully!`);
+        setSuccessMessage(`Goal "${goalTitle}" created successfully!`);
       } else if (itemType === 'tag') {
         if (!tagName.trim()) {
           setSubmitError('Please enter a tag name.');
@@ -253,11 +253,13 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         
         // 1. Call Organization Service to generate invitation token & link
         const targetSlug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+        console.log('[CreateItemModal] 🚀 Inviting new member:', { memberName, memberEmail, memberRole, targetSlug });
         const inviteRes = await organizationService.createInvite(targetSlug, {
           email: memberEmail.trim(),
           role: memberRole,
           teamId: targetTeamId,
         });
+        console.log('[CreateItemModal] 📬 createInvite response received:', inviteRes);
 
         addUser({
           orgId: targetSlug,
@@ -299,7 +301,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           memberIds: finalMemberIds,
           workflowTemplate: newTeamTemplate
         });
-        setSuccessMessage(`Team "${newTeamName}" created & saved to database successfully!`);
+        setSuccessMessage(`Team "${newTeamName}" created successfully!`);
       }
 
       setTimeout(() => {
@@ -308,7 +310,8 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         onClose();
       }, 200);
     } catch (err: any) {
-      setSubmitError(err.message || 'Database Save Error. Please try again.');
+      console.error('[CreateItemModal] ❌ Error in item creation modal:', err);
+      setSubmitError(err.message || 'Failed to save. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -425,7 +428,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           return { allowed: false, reason: 'Executives have strategic read-only view of tasks and do not create sprint items directly.' };
         }
         if (activeRole === 'HR') {
-          return { allowed: false, reason: 'HR roles are scoped to people & team management rather than technical sprint tasks.' };
+          return { allowed: false, reason: 'Human Resources roles are scoped to people & team management rather than technical sprint tasks.' };
         }
         return { allowed: false, reason: 'Contractors are restricted from creating new top-level tasks. Ask your Manager or Team Lead.' };
 
@@ -439,7 +442,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         if (['Admin', 'Executive', 'Manager'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot define strategic goals/OKRs. Switch to Executive, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot define strategic goals. Switch to Executive, Manager, or Admin.` };
 
       case 'tag':
         if (['Admin', 'Manager', 'TeamLead'].includes(activeRole)) {
@@ -451,13 +454,13 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         if (['Admin', 'Manager', 'HR'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot invite or provision user accounts. Switch to HR, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot invite or provision user accounts. Switch to Human Resources, Manager, or Admin.` };
 
       case 'team':
         if (['Admin', 'Manager', 'HR'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot create new organizational teams. Switch to HR, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot create new organizational teams. Switch to Human Resources, Manager, or Admin.` };
 
       default:
         return { allowed: true, reason: '' };
@@ -1090,7 +1093,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         {[
                           { id: 'SoftwareSprint', title: 'Software Development', desc: 'Optimized for sprints, issue tracking, and code review cycles.' },
                           { id: 'ClientOnboarding', title: 'Agency & Client Work', desc: 'Focuses on deliverables, approvals, and time tracking.' },
-                          { id: 'MarketingCampaign', title: 'Sales & Pipeline', desc: 'Structured for lead progression, CRM integration, and forecasting.' },
+                          { id: 'MarketingCampaign', title: 'Sales & Pipeline', desc: 'Structured for lead progression, customer relationship management, and forecasting.' },
                           { id: 'GeneralOps', title: 'General Operations', desc: 'A flexible, lightweight setup for standard task management.' }
                         ].map(tmpl => (
                           <div
@@ -1244,7 +1247,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           <option value="Member">Member</option>
                           <option value="TeamLead">Team Lead</option>
                           <option value="Manager">Manager</option>
-                          <option value="HR">HR Specialist</option>
+                          <option value="HR">Human Resources Specialist</option>
                           <option value="Executive">Executive</option>
                           <option value="Contractor">Contractor</option>
                         </select>
@@ -1308,7 +1311,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       {isSubmitting ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Saving to Database...</span>
+                          <span>Saving...</span>
                         </>
                       ) : (
                         <>

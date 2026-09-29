@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { ExportDropdown } from '../common/ExportDropdown';
@@ -7,15 +7,19 @@ import {
   List, LayoutGrid, GitCommit, Users, Filter, X, 
   ChevronDown, ChevronRight, CheckCircle2, Plus,
   MessageSquare, Calendar, AlertTriangle, GripVertical,
-  Check, ArrowUp, RotateCw
+  Check, ArrowUp, RotateCw, Sliders
 } from 'lucide-react';
 import type { TaskStatus } from '../../types';
 
 type ViewMode = 'list' | 'kanban' | 'timeline' | 'workload';
 
 export const TasksScreen: React.FC = () => {
-  const { tasks, projects, users, tags, pushPanel, reorderTasks, refreshWorkspaceData } = useApp();
+  const { 
+    tasks, projects, users, tags, pushPanel, reorderTasks, refreshWorkspaceData,
+    workloadSettings, currentUser, activeRole 
+  } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -208,7 +212,7 @@ export const TasksScreen: React.FC = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0"
-            title="Sync tasks with database"
+            title="Refresh tasks"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
@@ -313,7 +317,7 @@ export const TasksScreen: React.FC = () => {
               Status: t.status,
               Priority: t.priority,
               Assignee: t.assigneeIds.map(id => users.find(u => u.id === id)?.name || id).join(', ') || 'Unassigned',
-              DueDate: t.dueDate || 'N/A'
+              DueDate: t.dueDate || 'Not set'
             }))}
           />
 
@@ -876,7 +880,7 @@ export const TasksScreen: React.FC = () => {
                     <th className="py-2.5 px-4 w-64">Team Member</th>
                     <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Active Tasks</th>
                     <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Completed</th>
-                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Est. Hours</th>
+                    <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Est. Hours / Cap</th>
                     <th className="py-2.5 px-4 text-center border-l border-neutral-200 dark:border-neutral-800">Capacity Status</th>
                   </tr>
                 </thead>
@@ -885,8 +889,13 @@ export const TasksScreen: React.FC = () => {
                     const uTasks = tasks.filter(t => t.assigneeIds?.includes(u.id));
                     const activeTasks = uTasks.filter(t => t.status !== 'Done');
                     const doneTasks = uTasks.filter(t => t.status === 'Done');
-                    const totalHours = activeTasks.reduce((s, t) => s + (t.estimatedHours || 4), 0);
-                    const isOverbooked = totalHours > 40 || activeTasks.length > 5;
+                    const capacityHours = u.capacityHoursPerWeek || workloadSettings.standardWeeklyHours;
+                    const defaultTaskHours = workloadSettings.defaultTaskEstimatedHours || 4;
+                    const totalHours = activeTasks.reduce((s, t) => s + (t.estimatedHours || defaultTaskHours), 0);
+                    const isOverbooked = totalHours > (u.capacityHoursPerWeek || workloadSettings.overbookedHoursThreshold) || activeTasks.length > workloadSettings.maxActiveTasks;
+                    const isUnderbooked = totalHours < workloadSettings.optimalMinHours;
+                    const statusLabel = isOverbooked ? workloadSettings.overbookedLabel : isUnderbooked ? workloadSettings.underbookedLabel : workloadSettings.optimalLabel;
+                    const usagePct = Math.min(100, Math.round((totalHours / (capacityHours || 1)) * 100));
 
                     return (
                       <tr 
@@ -901,7 +910,7 @@ export const TasksScreen: React.FC = () => {
                               <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-neutral-100 font-sans">
                                 {u.name}
                                 {isOverbooked && (
-                                  <span title="High workload detected">
+                                  <span title="High workload or task overload detected">
                                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                                   </span>
                                 )}
@@ -912,21 +921,36 @@ export const TasksScreen: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center font-bold text-neutral-800 dark:text-neutral-200">
                           {activeTasks.length}
+                          <span className="text-[10px] font-normal text-neutral-400 ml-1">/ {workloadSettings.maxActiveTasks} max</span>
                         </td>
                         <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center text-emerald-600 font-bold">
                           {doneTasks.length}
                         </td>
                         <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center font-mono">
-                          {totalHours}h
+                          <div className="flex flex-col items-center">
+                            <span className="font-bold">{totalHours}h <span className="text-[10px] font-normal text-neutral-400">/ {capacityHours}h</span></span>
+                            <div className="w-16 h-1 bg-neutral-100 dark:bg-neutral-800 rounded-full mt-1 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  isOverbooked ? 'bg-amber-500' : isUnderbooked ? 'bg-blue-500' : 'bg-emerald-500'
+                                }`} 
+                                style={{ width: `${usagePct}%` }}
+                              />
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-4 border-l border-neutral-200 dark:border-neutral-800 text-center">
                           {isOverbooked ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                              Overbooked
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/40 dark:border-amber-800/40">
+                              {statusLabel}
+                            </span>
+                          ) : isUnderbooked ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-300/40 dark:border-blue-800/40">
+                              {statusLabel}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-                              Optimal
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300/40 dark:border-emerald-800/40">
+                              {statusLabel}
                             </span>
                           )}
                         </td>
@@ -938,12 +962,27 @@ export const TasksScreen: React.FC = () => {
             </div>
           )}
 
-          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center text-[11px] text-neutral-500 font-sans">
-            <span>Total Team Members: {users.length}</span>
-            <div className="flex items-center gap-4 font-mono text-[10px]">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Optimal</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Overbooked</span>
+          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap justify-between items-center gap-3 text-[11px] text-neutral-500 font-sans">
+            <div className="flex items-center gap-4">
+              <span>Total Team Members: {users.length}</span>
+              <div className="flex items-center gap-3 font-mono text-[10px]">
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /> {workloadSettings.underbookedLabel}</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> {workloadSettings.optimalLabel}</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> {workloadSettings.overbookedLabel}</span>
+              </div>
             </div>
+
+            {['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '') && (
+              <button
+                type="button"
+                onClick={() => navigate('/admin', { state: { tab: 'workload' } })}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-mono text-[10px] font-bold transition-all cursor-pointer border border-neutral-200 dark:border-neutral-700 shadow-xs"
+                title="Edit Workload & Capacity Constants in Settings"
+              >
+                <Sliders className="w-3 h-3 text-neutral-500" />
+                <span>Configure Thresholds</span>
+              </button>
+            )}
           </div>
         </div>
       ) : null}

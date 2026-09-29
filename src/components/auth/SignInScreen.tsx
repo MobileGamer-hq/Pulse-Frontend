@@ -183,7 +183,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Authenticating with Supabase...</span>
+                <span>Signing In...</span>
               </>
             ) : (
               <span>Sign In</span>

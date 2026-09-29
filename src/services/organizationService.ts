@@ -1,4 +1,5 @@
 import { supabase, getCurrentUserEmail, getCurrentUserName, getOrgIdBySlug, getOrgBySlug, ensureUserExists } from './supabaseClient';
+import { emailService } from './emailService';
 
 export interface CreateOrgPayload {
   name: string;
@@ -86,7 +87,7 @@ export const organizationService = {
 
     if (orgErr) {
       console.error('[createOrganization] Supabase org insert error:', orgErr);
-      throw new Error(orgErr.message || 'Failed to create organization in database.');
+      throw new Error(orgErr.message || 'Failed to create organization.');
     }
 
     const { error: memErr } = await supabase.from('organization_memberships').insert({
@@ -306,6 +307,29 @@ export const organizationService = {
     }
 
     const inviteLink = `${window.location.origin}/invite/${token}`;
+    console.log(`[organizationService.createInvite] 💾 Invite saved to Supabase successfully (token: ${token}). Now triggering email dispatch...`);
+
+    // Dispatch workspace invitation email asynchronously via modular email service
+    // Template variables: {{from_name}}, {{org_name}}, {{token}}
+    const inviterName = getCurrentUserName() || 'A workspace member';
+    console.log(`[organizationService.createInvite] ✉️ Dispatching invite email to: "${payload.email}" from "${inviterName}" for org "${org.name}"`);
+
+    emailService.sendInviteEmail({
+      toEmail: payload.email.trim().toLowerCase(),
+      fromName: inviterName,
+      orgName: org.name,
+      token,
+      inviteLink,
+      role: payload.role || 'Member',
+    }).then((res) => {
+      if (res.success) {
+        console.log(`[organizationService.createInvite] ✅ Invitation email sent successfully to "${payload.email}"!`, res);
+      } else {
+        console.error(`[organizationService.createInvite] ❌ Invitation email FAILED to send to "${payload.email}":`, res.error);
+      }
+    }).catch((emailErr) => {
+      console.error('[organizationService.createInvite] ❌ Invitation email unexpected exception:', emailErr);
+    });
 
     return {
       success: true,

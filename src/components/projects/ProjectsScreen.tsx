@@ -126,7 +126,7 @@ export const ProjectsScreen: React.FC = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0 font-mono"
-            title="Sync projects with database"
+            title="Refresh projects"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>

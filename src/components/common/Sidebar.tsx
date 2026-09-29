@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   LayoutDashboard, FolderGit2, CheckSquare, BarChart3, 
   Target, Users, Settings, HelpCircle, Archive, Plus, X, Activity, Network,
-  PanelLeftClose, PanelLeftOpen, LogOut, FileText, Building2, ChevronDown
+  PanelLeftClose, PanelLeftOpen, LogOut, FileText, Building2, ChevronDown, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +34,7 @@ export const Sidebar: React.FC = () => {
     { id: 'relationships', label: 'Relationships', icon: Network },
     { id: 'projects', label: 'Projects', icon: FolderGit2 },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
     { id: 'pulse', label: 'Daily Pulse', icon: Activity },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'reports', label: 'Reports', icon: FileText },

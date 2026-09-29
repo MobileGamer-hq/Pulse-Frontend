@@ -152,10 +152,9 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
       const dist = 220;
 
       const userEod = eodEntries.find(e => e.userId === u.id);
-      let eodStatus: 'good' | 'low' | 'blocked' | 'neutral' = 'neutral';
+      let eodStatus: 'good' | 'blocked' | 'neutral' = 'neutral';
       if (userEod) {
-        if (userEod.flaggedToManager || userEod.blockedTaskId) eodStatus = 'blocked';
-        else if (userEod.energyIndex <= 2) eodStatus = 'low';
+        if (userEod.flaggedToManager || userEod.blockedTaskId || (userEod.blockers && userEod.blockers.trim() && userEod.blockers.toLowerCase() !== 'no blockers')) eodStatus = 'blocked';
         else eodStatus = 'good';
       }
 

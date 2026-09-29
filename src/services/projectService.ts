@@ -74,7 +74,7 @@ export const projectService = {
 
     if (error) {
       console.error('[projectService.createProject] Supabase error:', error);
-      throw new Error(error.message || 'Failed to create project in database.');
+      throw new Error(error.message || 'Failed to create project.');
     }
 
     if (payload.memberIds && payload.memberIds.length > 0) {

@@ -5,6 +5,7 @@ import { PulseLogo } from '../common/PulseLogo';
 import { organizationService } from '../../services/organizationService';
 import { teamService } from '../../services/teamService';
 import { supabase } from '../../services/supabaseClient';
+import { emailService } from '../../services/emailService';
 import type { WorkflowTemplate } from '../../types';
 
 interface OnboardingWizardScreenProps {
@@ -107,6 +108,14 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
         localStorage.setItem('pulse_user_id', data.user.id);
         localStorage.setItem('pulse_user_email', cleanEmail);
         localStorage.setItem('pulse_user_name', cleanFullName);
+
+        // Dispatch welcome email asynchronously
+        emailService.sendWelcomeEmail({
+          toEmail: cleanEmail,
+          toName: cleanFullName,
+        }).catch((emailErr) => {
+          console.warn('[OnboardingWizard] Welcome email failed to send:', emailErr);
+        });
       }
 
       setStep(2);

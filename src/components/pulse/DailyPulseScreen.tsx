@@ -254,7 +254,7 @@ export const DailyPulseScreen: React.FC = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3 py-2 rounded-xl bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white border border-neutral-200 dark:border-neutral-700 font-mono text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Sync pulse check-ins with database"
+            title="Refresh pulse check-ins"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>

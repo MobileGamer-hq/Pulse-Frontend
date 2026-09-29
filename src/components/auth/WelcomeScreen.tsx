@@ -140,7 +140,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
               <div className="p-3 rounded-md bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 flex justify-between items-center">
                 <div>
-                  <div className="text-[11px] text-neutral-500">Daily EOD Submissions</div>
+                  <div className="text-[11px] text-neutral-500">Daily Check-in Submissions</div>
                   <div className="font-bold text-sm text-neutral-900 dark:text-neutral-100">18 of 20 Members</div>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
@@ -190,7 +190,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
             <h3 className="font-bold text-base tracking-tight text-neutral-900 dark:text-white">Role Governance</h3>
             <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-              7 privilege tiers (Admin, Executive, HR, Manager, Team Lead, Member, Contractor) with scoped data access.
+              7 privilege tiers (Admin, Executive, Human Resources, Manager, Team Lead, Member, Contractor) with scoped data access.
             </p>
           </div>
 
@@ -200,7 +200,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
             <h3 className="font-bold text-base tracking-tight text-neutral-900 dark:text-white">Multi-Dimensional Workflows</h3>
             <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-              Single workspace accommodating software sprint boards, client project deliverables, and high-level OKR goals.
+              Single workspace accommodating software sprint boards, client project deliverables, and high-level strategic goals.
             </p>
           </div>
         </div>
@@ -251,7 +251,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   Get Started with Pulse
                 </h3>
                 <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed font-sans">
-                  Create your organization workspace or sign in to your team to start logging daily pulse standups and tracking OKRs.
+                  Create your organization workspace or sign in to your team to start logging daily pulse standups and tracking strategic goals.
                 </p>
               </div>
 

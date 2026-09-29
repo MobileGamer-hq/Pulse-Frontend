@@ -15,9 +15,11 @@ interface ProjectDetailPanelProps {
 export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) => {
   const { 
     projects, tasks, teams, users, tags, currentUser, popPanel, addTask, updateTask, updateProject,
-    currentOrgSlug, setActiveScreen, attachTagToEntity, detachTagFromEntity 
+    currentOrgSlug, setActiveScreen, attachTagToEntity, detachTagFromEntity, activeRole
   } = useApp();
   const navigate = useNavigate();
+
+  const canManageProject = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
 
   const handleOpenRelationshipMap = () => {
     popPanel();
@@ -133,17 +135,19 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
           </div>
 
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setIsEditingProj(prev => !prev)}
-              title="Edit Project Details"
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isEditingProj 
-                  ? 'bg-black text-white dark:bg-white dark:text-black' 
-                  : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              }`}
-            >
-              <span className="text-xs font-mono font-bold">{isEditingProj ? 'Editing...' : 'Edit'}</span>
-            </button>
+            {canManageProject && (
+              <button 
+                onClick={() => setIsEditingProj(prev => !prev)}
+                title="Edit Project Details"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isEditingProj 
+                    ? 'bg-black text-white dark:bg-white dark:text-black' 
+                    : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                }`}
+              >
+                <span className="text-xs font-mono font-bold">{isEditingProj ? 'Editing...' : 'Edit'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -215,21 +219,27 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
           <div className="p-4 rounded-xl bg-neutral-50/50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
             <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">Assigned Team</span>
-            <select
-              value={project?.teamId || ''}
-              onChange={async e => {
-                if (project && e.target.value) {
-                  try {
-                    await updateProject(project.id, { teamId: e.target.value });
-                  } catch (err) { console.warn(err); }
-                }
-              }}
-              className="w-full px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
-            >
-              {teams.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+            {canManageProject ? (
+              <select
+                value={project?.teamId || ''}
+                onChange={async e => {
+                  if (project && e.target.value) {
+                    try {
+                      await updateProject(project.id, { teamId: e.target.value });
+                    } catch (err) { console.warn(err); }
+                  }
+                }}
+                className="w-full px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                {teams.find(t => t.id === project?.teamId)?.name || 'Unassigned'}
+              </div>
+            )}
             <span className="text-[10px] text-neutral-400 block">{project?.templateType || 'SoftwareSprint'}</span>
           </div>
 

@@ -57,7 +57,7 @@ export const teamService = {
 
     if (error) {
       console.error('[teamService.createTeam] Supabase error:', error);
-      throw new Error(error.message || 'Failed to create team in database.');
+      throw new Error(error.message || 'Failed to create team.');
     }
 
     if (finalMemberIds.length > 0) {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { 
@@ -53,8 +54,16 @@ const COMMON_TIMEZONES = [
 export const AdminSettingsScreen: React.FC = () => {
   const { 
     isDarkMode, setIsDarkMode, pushPanel, tags, reorderTags, addTag, updateTag, deleteTag,
-    currentUser, currentOrgSlug, currentOrgName, activeRole, users 
+    currentUser, currentOrgSlug, currentOrgName, activeRole, users,
+    workloadSettings, updateWorkloadSettings, resetWorkloadSettings
   } = useApp();
+
+  const [workloadForm, setWorkloadForm] = useState(workloadSettings);
+  const [workloadSavedToast, setWorkloadSavedToast] = useState(false);
+
+  React.useEffect(() => {
+    setWorkloadForm(workloadSettings);
+  }, [workloadSettings]);
 
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -132,13 +141,22 @@ export const AdminSettingsScreen: React.FC = () => {
   const isBillingAllowed = ['Admin', 'Executive'].includes(activeRole);
   const isRBACAllowed = ['Admin', 'Executive', 'HR'].includes(activeRole);
 
-  const [activeTab, setActiveTab] = useState<'user_profile' | 'appearance' | 'notif_controls' | 'profile' | 'rbac' | 'integrations' | 'billing' | 'tags'>(() => {
+  const location = useLocation();
+
+  const [activeTab, setActiveTab] = useState<'user_profile' | 'appearance' | 'notif_controls' | 'profile' | 'rbac' | 'integrations' | 'billing' | 'tags' | 'workload'>(() => {
+    if (location.state?.tab) return location.state.tab;
     return isCompanyAdmin ? 'profile' : 'user_profile';
   });
   const [companySubTab, setCompanySubTab] = useState<'profile' | 'security' | 'billing' | 'integrations' | 'audit'>('profile');
 
   React.useEffect(() => {
-    if (!isCompanyAdmin && ['profile', 'rbac', 'integrations', 'billing', 'tags'].includes(activeTab)) {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+  }, [location.state]);
+
+  React.useEffect(() => {
+    if (!isCompanyAdmin && ['profile', 'rbac', 'integrations', 'billing', 'tags', 'workload'].includes(activeTab)) {
       setActiveTab('user_profile');
     }
   }, [activeRole, isCompanyAdmin, activeTab]);
@@ -353,6 +371,19 @@ export const AdminSettingsScreen: React.FC = () => {
               }`}
             >
               <TagIcon className="w-3.5 h-3.5" /> Tags
+            </button>
+          )}
+
+          {isCompanyAdmin && (
+            <button
+              onClick={() => setActiveTab('workload')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                activeTab === 'workload' 
+                  ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm font-bold' 
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5" /> Workload &amp; Capacity
             </button>
           )}
         </div>
@@ -2544,6 +2575,245 @@ export const AdminSettingsScreen: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* 9. WORKLOAD & CAPACITY RULES VIEW */}
+      {activeTab === 'workload' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-neutral-200 dark:border-neutral-800 font-mono">
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans flex items-center gap-2">
+                <Sliders className="w-5 h-5" /> Workload &amp; Capacity Rules
+              </h1>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Customize weekly working hours, active task caps, and overbooked/optimal classification thresholds for your organization.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  resetWorkloadSettings();
+                  setWorkloadForm(workloadSettings);
+                  recordAuditLog('Reset capacity rules to defaults', 'Workload Settings');
+                  setWorkloadSavedToast(true);
+                  setTimeout(() => setWorkloadSavedToast(false), 3000);
+                }}
+                className="px-3.5 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+              >
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateWorkloadSettings(workloadForm);
+                  recordAuditLog('Updated capacity & workload thresholds', 'Workload Settings');
+                  setWorkloadSavedToast(true);
+                  setTimeout(() => setWorkloadSavedToast(false), 3000);
+                }}
+                className="px-5 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" /> Save Rules
+              </button>
+            </div>
+          </div>
+
+          {workloadSavedToast && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Capacity constants and workload rules saved! All tasks, matrices, and profile badges are updated.</span>
+            </div>
+          )}
+
+          <div className="max-w-4xl space-y-6 font-sans">
+              {/* Card 1: Standard Capacity Baselines */}
+              <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-3">
+                  <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                    Standard Weekly Hours &amp; Task Estimates
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-mono mt-0.5">
+                    Define baseline hours allocated per full-time team member and default task duration.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 font-mono text-xs">
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Standard Weekly Hours / Member
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={10}
+                        max={80}
+                        value={workloadForm.standardWeeklyHours}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, standardWeeklyHours: Number(e.target.value) || 40 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">hrs / wk</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Default 40h standard working week.</p>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Default Task Estimate (Fallback)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={40}
+                        value={workloadForm.defaultTaskEstimatedHours}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, defaultTaskEstimatedHours: Number(e.target.value) || 4 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">hours</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Used when tasks have no explicit estimate.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Workload Thresholds & Limits */}
+              <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-3">
+                  <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                    Classification Thresholds &amp; Caps
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-mono mt-0.5">
+                    Define the boundary conditions for flagging members as underbooked, optimal, or overbooked.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 font-mono text-xs">
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Overbooked Hours Threshold
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={10}
+                        max={100}
+                        value={workloadForm.overbookedHoursThreshold}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, overbookedHoursThreshold: Number(e.target.value) || 40 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">hrs / wk</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Allocated hours exceeding this will be marked overbooked.</p>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Max Concurrent Active Tasks Cap
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={workloadForm.maxActiveTasks}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, maxActiveTasks: Number(e.target.value) || 5 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">tasks</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Warns if a teammate has more active tasks than this cap.</p>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Optimal Range - Minimum Hours
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={5}
+                        max={50}
+                        value={workloadForm.optimalMinHours}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, optimalMinHours: Number(e.target.value) || 20 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">hrs / wk</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Below this boundary is classified as underbooked / available.</p>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Optimal Range - Maximum Hours
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={10}
+                        max={80}
+                        value={workloadForm.optimalMaxHours}
+                        onChange={e => setWorkloadForm(prev => ({ ...prev, optimalMaxHours: Number(e.target.value) || 40 }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-bold focus:outline-none"
+                      />
+                      <span className="text-neutral-400 font-bold shrink-0">hrs / wk</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-1">Healthy upper bound for balanced sprint execution.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Custom Status Badge Nomenclature */}
+              <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-3">
+                  <h3 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100">
+                    Custom Status Badge Nomenclature
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-mono mt-0.5">
+                    Customize the terminology used on cards and tables across your workspace.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Under Capacity Label
+                    </label>
+                    <input
+                      type="text"
+                      value={workloadForm.underbookedLabel}
+                      onChange={e => setWorkloadForm(prev => ({ ...prev, underbookedLabel: e.target.value }))}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Optimal Capacity Label
+                    </label>
+                    <input
+                      type="text"
+                      value={workloadForm.optimalLabel}
+                      onChange={e => setWorkloadForm(prev => ({ ...prev, optimalLabel: e.target.value }))}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Over Capacity Label
+                    </label>
+                    <input
+                      type="text"
+                      value={workloadForm.overbookedLabel}
+                      onChange={e => setWorkloadForm(prev => ({ ...prev, overbookedLabel: e.target.value }))}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
       )}
     </div>
   );

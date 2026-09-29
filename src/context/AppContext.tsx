@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { 
   User, Role, Tag, Task, Project, Team, EODEntry, Goal, Report, 
-  ActivityLog, FilterState, SavedView, DrawerPanel, Organization, Priority, TaskStatus, Notification
+  ActivityLog, FilterState, SavedView, DrawerPanel, Organization, Priority, TaskStatus, Notification,
+  WorkloadSettings
 } from '../types';
+import { DEFAULT_WORKLOAD_SETTINGS } from '../types';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
 import { teamService } from '../services/teamService';
@@ -126,6 +128,11 @@ interface AppContextType {
   refreshAnalytics: (timeRange?: string) => Promise<void>;
   isWorkspaceLoading: boolean;
   refreshWorkspaceData: (isSilent?: boolean) => Promise<void>;
+
+  // Workload & Capacity Configuration
+  workloadSettings: WorkloadSettings;
+  updateWorkloadSettings: (settings: Partial<WorkloadSettings>) => void;
+  resetWorkloadSettings: () => void;
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -186,7 +193,9 @@ const getInitialUser = (): User => ({
   role: 'Member',
   teamId: 'team-main',
   teamName: 'Core Operations',
-  title: '',
+  title: localStorage.getItem('pulse_user_title') || '',
+  avatarColor: localStorage.getItem('pulse_user_avatar_color') || undefined,
+  avatarUrl: localStorage.getItem('pulse_user_avatar_url') || undefined,
   capacityHoursPerWeek: 40,
   activeProjectIds: []
 });
@@ -235,6 +244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.toLowerCase();
       if (path.includes('/tasks')) return 'tasks';
+      if (path.includes('/schedule')) return 'schedule';
       if (path.includes('/projects')) return 'projects';
       if (path.includes('/pulse')) return 'pulse';
       if (path.includes('/relationships') || path.includes('/spiderweb-relationships') || path.includes('/lab-relationships')) return 'relationships';
@@ -274,6 +284,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeOrgDetails, setActiveOrgDetails] = useState<{ id: string; name: string; slug: string } | null>(null);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Workload & Capacity Configuration State (Persisted per Org)
+  const getInitialWorkloadSettings = (slug: string): WorkloadSettings => {
+    try {
+      const stored = localStorage.getItem(`pulse_workload_settings_${slug}`);
+      if (stored) {
+        return { ...DEFAULT_WORKLOAD_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch (e) {}
+    return DEFAULT_WORKLOAD_SETTINGS;
+  };
+
+  const [workloadSettings, setWorkloadSettings] = useState<WorkloadSettings>(() =>
+    getInitialWorkloadSettings(getInitialOrgSlug())
+  );
+
+  useEffect(() => {
+    if (currentOrgSlug) {
+      setWorkloadSettings(getInitialWorkloadSettings(currentOrgSlug));
+    }
+  }, [currentOrgSlug]);
+
+  const updateWorkloadSettings = (updates: Partial<WorkloadSettings>) => {
+    setWorkloadSettings(prev => {
+      const next = { ...prev, ...updates };
+      try {
+        const slug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+        localStorage.setItem(`pulse_workload_settings_${slug}`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const resetWorkloadSettings = () => {
+    setWorkloadSettings(DEFAULT_WORKLOAD_SETTINGS);
+    try {
+      const slug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
+      localStorage.setItem(`pulse_workload_settings_${slug}`, JSON.stringify(DEFAULT_WORKLOAD_SETTINGS));
+    } catch (e) {}
+  };
 
   const currentOrg = userOrgs.find(
     o => (o.slug || '').toLowerCase() === (currentOrgSlug || '').toLowerCase()
@@ -348,6 +398,9 @@ const markAllNotificationsAsRead = async () => {
       if (userData.id) localStorage.setItem('pulse_user_id', userData.id);
       if (userData.email) localStorage.setItem('pulse_user_email', userData.email);
       if (userData.name) localStorage.setItem('pulse_user_name', userData.name);
+      if (userData.title !== undefined) localStorage.setItem('pulse_user_title', userData.title || '');
+      if (userData.avatarColor) localStorage.setItem('pulse_user_avatar_color', userData.avatarColor);
+      if (userData.avatarUrl !== undefined) localStorage.setItem('pulse_user_avatar_url', userData.avatarUrl || '');
       return next;
     });
   };
@@ -785,7 +838,7 @@ const markAllNotificationsAsRead = async () => {
       await loadBackendData(false);
       return res.organization;
     }
-    throw new Error('Failed to create organization in database.');
+    throw new Error('Failed to create organization.');
   };
 
   const updateOrgMemberStatus = (slug: string, role: Role | 'Pending Role Assignment', status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
@@ -914,7 +967,7 @@ const markAllNotificationsAsRead = async () => {
       setTasks(prev => [createdTask, ...prev]);
       return createdTask;
     }
-    throw new Error((res as any)?.error || 'Failed to create task in database.');
+    throw new Error((res as any)?.error || 'Failed to create task.');
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
@@ -1133,7 +1186,7 @@ const markAllNotificationsAsRead = async () => {
       setEodEntries(prev => [createdEntry, ...prev.filter(e => !(e.userId === createdEntry.userId && e.date === createdEntry.date))]);
       return createdEntry;
     }
-    throw new Error((res as any)?.error || 'Failed to submit EOD entry to database.');
+    throw new Error((res as any)?.error || 'Failed to submit daily check-in.');
   };
 
   const deleteEOD = async (entryId: string) => {
@@ -1317,7 +1370,7 @@ const markAllNotificationsAsRead = async () => {
       setProjects(prev => [createdProject, ...prev]);
       return createdProject;
     }
-    throw new Error((res as any)?.error || 'Failed to create project in database.');
+    throw new Error((res as any)?.error || 'Failed to create project.');
   };
 
   const updateProject = async (projectId: string, updates: Partial<Project>) => {
@@ -1387,7 +1440,7 @@ const markAllNotificationsAsRead = async () => {
       setGoals(prev => [createdGoal, ...prev]);
       return createdGoal;
     }
-    throw new Error((res as any)?.error || 'Failed to create goal in database.');
+    throw new Error((res as any)?.error || 'Failed to create goal.');
   };
 
   const updateGoal = (goalId: string, updates: Partial<Goal>) => {
@@ -1431,6 +1484,11 @@ const markAllNotificationsAsRead = async () => {
   };
 
   const addTeam = async (teamData: Omit<Team, 'id' | 'orgId'>, targetOrgSlug?: string) => {
+    const userRole = activeRole || currentUser?.role || '';
+    if (!['Admin', 'Manager', 'HR'].includes(userRole)) {
+      throw new Error(`Permission Denied: Role "${userRole}" is not authorized to create teams.`);
+    }
+
     const slugToUse = targetOrgSlug || currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || '';
     if (!slugToUse) {
       throw new Error('Organization context missing. Please select or create an organization first.');
@@ -1470,10 +1528,15 @@ const markAllNotificationsAsRead = async () => {
 
       return createdTeam;
     }
-    throw new Error((res as any)?.error || 'Failed to create team in database.');
+    throw new Error((res as any)?.error || 'Failed to create team.');
   };
 
   const updateTeam = async (teamId: string, updates: Partial<Team>) => {
+    const userRole = activeRole || currentUser?.role || '';
+    if (!['Admin', 'Manager', 'HR'].includes(userRole)) {
+      throw new Error(`Permission Denied: Role "${userRole}" is not authorized to modify teams.`);
+    }
+
     setTeams(prev => prev.map(tm => tm.id === teamId ? { ...tm, ...updates } : tm));
 
     if (updates.memberIds !== undefined) {
@@ -1517,6 +1580,11 @@ const markAllNotificationsAsRead = async () => {
   };
 
   const removeMemberFromOrg = async (userId: string) => {
+    const userRole = activeRole || currentUser?.role || '';
+    if (!['Admin', 'Manager', 'HR'].includes(userRole)) {
+      throw new Error(`Permission Denied: Role "${userRole}" is not authorized to remove members from the organization.`);
+    }
+
     setUsers(prev => prev.filter(u => u.id !== userId));
     // Remove user from all teams locally
     setTeams(prev => prev.map(t => ({
@@ -1597,6 +1665,11 @@ const markAllNotificationsAsRead = async () => {
   };
 
   const deleteTeam = async (teamId: string) => {
+    const userRole = activeRole || currentUser?.role || '';
+    if (!['Admin', 'Manager', 'HR'].includes(userRole)) {
+      throw new Error(`Permission Denied: Role "${userRole}" is not authorized to delete teams.`);
+    }
+
     setTeams(prev => prev.filter(tm => tm.id !== teamId));
     try {
       await teamService.deleteTeam(currentOrgSlug, teamId);
@@ -1783,6 +1856,11 @@ const markAllNotificationsAsRead = async () => {
         refreshAnalytics,
         isWorkspaceLoading,
         refreshWorkspaceData,
+
+        // Workload & Capacity Configuration
+        workloadSettings,
+        updateWorkloadSettings,
+        resetWorkloadSettings,
       }}
     >
       {children}

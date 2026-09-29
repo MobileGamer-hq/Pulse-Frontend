@@ -220,7 +220,7 @@ export const NotificationsScreen: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Notifications</h1>
-              <p className="text-xs text-neutral-500 font-mono mt-0.5">Manage, triage, and grant access requests from live database notifications.</p>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">Manage, triage, and grant access requests.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 font-mono">
@@ -249,7 +249,7 @@ export const NotificationsScreen: React.FC = () => {
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                title="Sync notifications with live database"
+                title="Refresh notifications"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
                 <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>

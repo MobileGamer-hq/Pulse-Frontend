@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User as UserIcon, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../services/supabaseClient';
+import { emailService } from '../../services/emailService';
 import { PulseLogo } from '../common/PulseLogo';
 
 export const SignUpScreen: React.FC = () => {
@@ -82,7 +83,15 @@ export const SignUpScreen: React.FC = () => {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
 
-      // 3. Update React Context & Store session token in localStorage
+      // 3. Dispatch welcome email via modular email service
+      emailService.sendWelcomeEmail({
+        toEmail: cleanEmail,
+        toName: cleanFullName,
+      }).catch((emailErr) => {
+        console.warn('[SignUpScreen] Welcome email failed to send:', emailErr);
+      });
+
+      // 4. Update React Context & Store session token in localStorage
       updateCurrentUser({
         id: userId,
         email: cleanEmail,
@@ -228,7 +237,7 @@ export const SignUpScreen: React.FC = () => {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Creating Account in Supabase...</span>
+                <span>Creating Account...</span>
               </>
             ) : (
               <span>Create Account</span>

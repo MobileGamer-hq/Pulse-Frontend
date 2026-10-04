@@ -4,7 +4,7 @@ import { UserAvatar } from '../common/UserAvatar';
 import { 
   Pencil, Link as LinkIcon, X, Plus, 
   MessageSquare, GripVertical,
-  Trash2, Edit2, Check
+  Trash2, Edit2, Check, Lock, Globe, Calendar
 } from 'lucide-react';
 import type { TaskStatus, Priority } from '../../types';
 
@@ -35,7 +35,9 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
     attachTagToEntity, detachTagFromEntity
   } = useApp();
 
-  const task = tasks.find(t => t.id === id);
+  const task = tasks.find(t => t.id === id) ||
+    tasks.find(t => t.title.toLowerCase() === id.toLowerCase()) ||
+    (id.length > 3 ? tasks.find(t => t.title.toLowerCase().includes(id.toLowerCase())) : undefined);
 
   // Task title & description editing state
   const [isEditingMain, setIsEditingMain] = useState(false);
@@ -134,6 +136,12 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
             <MessageSquare className="w-3 h-3 text-neutral-500" />
             {task.status}
           </span>
+          {task.isPrivate && (
+            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+              <Lock className="w-3 h-3" />
+              Private
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -532,13 +540,69 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ id }) => {
               </select>
             </div>
 
+            {/* Task Privacy Control */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Privacy / Visibility</label>
+                {task.isPrivate ? (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Restricted
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-neutral-500 flex items-center gap-1">
+                    <Globe className="w-2.5 h-2.5" /> Public
+                  </span>
+                )}
+              </div>
+              <select
+                value={task.isPrivate ? 'private' : 'public'}
+                onChange={async (e) => {
+                  const isPrivate = e.target.value === 'private';
+                  try {
+                    await updateTask(task.id, { isPrivate });
+                  } catch (err) {
+                    console.warn(err);
+                  }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+              >
+                <option value="public">Public (Visible to whole team)</option>
+                <option value="private">Private (Only assignees & management)</option>
+              </select>
+              <p className="text-[10px] text-neutral-400 mt-1 leading-normal font-sans">
+                {task.isPrivate 
+                  ? 'Only assigned members, managers, executives, and admins can view this task.'
+                  : 'All team members can see this task on the board and project views.'}
+              </p>
+            </div>
+
             {/* Due Date, Est Hours & Actual Hours */}
             <div className="grid grid-cols-2 gap-2">
               <div className="col-span-2">
-                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Due Date</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-neutral-400" />
+                    Due Date
+                  </label>
+                  {task.dueDate && (
+                    <button 
+                      type="button" 
+                      onClick={async () => {
+                        try {
+                          await updateTask(task.id, { dueDate: '' });
+                        } catch (err) {
+                          console.warn(err);
+                        }
+                      }} 
+                      className="text-[10px] text-neutral-400 hover:text-red-500 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <input
                   type="date"
-                  value={task.dueDate || ''}
+                  value={task.dueDate ? (task.dueDate.includes('T') ? task.dueDate.split('T')[0] : task.dueDate) : ''}
                   onChange={async e => {
                     try {
                       await updateTask(task.id, { dueDate: e.target.value });

@@ -64,30 +64,44 @@ export const executeOpsTool = async (
           : [];
 
         // Execute task creation through AppContext
-        appContext.addTask({
-          orgId: appContext.currentOrg?.id || '',
-          projectId: projId,
-          projectName: projName,
-          title,
-          description: p.description || '',
-          status: 'Todo',
-          priority: priority as any,
-          assigneeIds: resolvedAssigneeIds,
-          estimatedHours: p.estimated_hours || 4,
-          actualHours: 0,
-          dueDate,
-          tagIds: [],
-          dependencyTaskIds: p.depends_on_task_ids || [],
-          subtasks: subtasksList,
-          comments: [],
-        });
+        let createdTask: any = null;
+        try {
+          createdTask = await appContext.addTask({
+            orgId: appContext.currentOrg?.id || '',
+            projectId: projId,
+            projectName: projName,
+            title,
+            description: p.description || '',
+            status: 'Todo',
+            priority: priority as any,
+            assigneeIds: resolvedAssigneeIds,
+            estimatedHours: p.estimated_hours || 4,
+            actualHours: 0,
+            dueDate,
+            tagIds: [],
+            dependencyTaskIds: p.depends_on_task_ids || [],
+            subtasks: subtasksList,
+            comments: [],
+          });
+        } catch (addErr) {
+          console.error('[executeOpsTool addTask error]:', addErr);
+        }
+
+        const newTaskId = createdTask?.id;
 
         return {
           tool: 'create_task',
           status: 'success',
           wasNoOp: false,
           message: `Created task "${title}" in project "${projName}" with due date ${dueDate}.`,
-          data: { title, projectName: projName, dueDate, priority, subtasksCount: subtasksList.length },
+          data: {
+            taskId: newTaskId,
+            title: createdTask?.title || title,
+            projectName: projName,
+            dueDate,
+            priority,
+            subtasksCount: subtasksList.length
+          },
         };
       }
 
@@ -114,7 +128,7 @@ export const executeOpsTool = async (
         if (p.blocked_reason) updates.blockedReason = p.blocked_reason;
         if (p.actual_hours !== undefined) updates.actualHours = p.actual_hours;
 
-        appContext.updateTask(task.id, updates);
+        await appContext.updateTask(task.id, updates);
 
         return {
           tool: 'update_task',
@@ -141,7 +155,7 @@ export const executeOpsTool = async (
           };
         }
 
-        appContext.updateTask(task.id, {
+        await appContext.updateTask(task.id, {
           status: (p.next_status || 'InProgress') as any,
           blockedReason: undefined,
         });
@@ -151,6 +165,7 @@ export const executeOpsTool = async (
           status: 'success',
           wasNoOp: false,
           message: `Cleared blocker from "${task.title}" and set status to ${p.next_status || 'InProgress'}.`,
+          data: { taskId: task.id, title: task.title },
         };
       }
 

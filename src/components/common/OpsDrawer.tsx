@@ -241,7 +241,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
           t => (taskId && t.id === taskId) || (title && t.title.toLowerCase() === title.toLowerCase())
         );
 
-        const finalId = matchedTask?.id || taskId;
+        const finalId = res.data?.taskId || act.parameters?.task_id || matchedTask?.id;
         const finalTitle = matchedTask?.title || title;
 
         // Skip invalid, empty, or generic fallback titles like "Task"
@@ -257,7 +257,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         seenTitles.add(normTitle);
 
         chips.push({
-          id: finalId || `task_${Date.now()}`,
+          id: finalId || finalTitle,
           title: finalTitle,
           status: matchedTask?.status || 'Todo',
           dueDate: matchedTask?.dueDate || res.data?.dueDate || act.parameters?.due_date,
@@ -787,7 +787,9 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                           chip={chip}
                           onToggleStatus={handleToggleTask}
                           onOpenDetail={(id) => {
-                            pushPanel({ type: 'task', id });
+                            const matched = tasks.find(t => t.id === id || t.title.toLowerCase() === chip.title.toLowerCase());
+                            const finalTaskId = matched?.id || id;
+                            pushPanel({ type: 'task', id: finalTaskId });
                             onClose();
                           }}
                         />

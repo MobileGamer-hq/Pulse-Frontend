@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Bot, X, Send, RotateCcw, Layers,
+  X, Send, RotateCcw, Layers,
   ChevronDown, ChevronRight, Check, Loader2, Sparkles
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -9,6 +9,7 @@ import { aiService, type DryRunDiff, type ActionCall } from '../../services/aiSe
 import { executeOpsTool, type ToolExecutionResult } from '../../services/opsToolExecutor';
 import { DiffPreviewModal } from './DiffPreviewModal';
 import { UserAvatar } from './UserAvatar';
+import ReactMarkdown from 'react-markdown';
 
 interface ActionStep {
   id: string;
@@ -135,7 +136,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
     {
       id: 'welcome',
       sender: 'ops',
-      text: "Ops operational partner ready. What can I help unblock, schedule, or organize for the team today?",
+      text: "Vein is ready. I help keep things running smoothly across Pulse. What can I help unblock, schedule, or organize today?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -654,19 +655,19 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-800/40">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900">
-              <Bot className="w-5 h-5" />
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 tracking-tight">
-                  Ops
+                  Vein
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  Operational Partner
+                  Pulse Circulatory Engine
                 </span>
               </div>
               <p className="text-[11px] text-neutral-500 font-mono">
-                Role: {currentUser.role} • Client-Staged Execution
+                Role: {currentUser.role} • Keeps things running
               </p>
             </div>
           </div>
@@ -751,16 +752,29 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                         <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 animate-bounce [animation-delay:-0.15s]" />
                         <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 animate-bounce" />
                       </span>
-                      <span className="italic font-mono text-[11px]">Ops is thinking...</span>
+                      <span className="italic font-mono text-[11px]">Vein is thinking...</span>
                     </div>
                   ) : m.text ? (
-                    <div className="text-[13px] leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap font-sans">
-                      {m.text}
-                      {m.isStreaming && (
-                        <span className="inline-block animate-pulse font-mono text-neutral-400 dark:text-neutral-500 font-bold ml-1">
-                          ▊
-                        </span>
-                      )}
+                    <div className="text-[13px] leading-relaxed text-neutral-800 dark:text-neutral-200 font-sans">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-2 leading-relaxed last:mb-0">{children}</p>,
+                          strong: ({ children }) => <strong className="font-bold text-neutral-900 dark:text-neutral-100">{children}</strong>,
+                          ul: ({ children }) => <ul className="list-disc list-outside pl-4 space-y-1 my-1.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-outside pl-4 space-y-1 my-1.5">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          code: ({ children }) => (
+                            <code className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs">
+                              {children}
+                            </code>
+                          ),
+                          h1: ({ children }) => <h1 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 mt-2 mb-1">{children}</h1>,
+                          h2: ({ children }) => <h2 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 mt-2 mb-1">{children}</h2>,
+                          h3: ({ children }) => <h3 className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 mt-1.5 mb-0.5">{children}</h3>,
+                        }}
+                      >
+                        {m.text + (m.isStreaming ? ' ▊' : '')}
+                      </ReactMarkdown>
                     </div>
                   ) : null}
 
@@ -842,7 +856,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Ops or enter an action (Cmd+J)..."
+              placeholder="Ask Vein or enter an action (Cmd+J)..."
               disabled={isStreaming}
               className="flex-1 px-3.5 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400"
             />

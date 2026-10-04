@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from './UserAvatar';
 import { PulseLogo } from './PulseLogo';
-import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Building2, CheckCircle2, AlertTriangle, Plus, ChevronsUpDown, ChevronRight, Check, Key, Bot } from 'lucide-react';
+import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Building2, CheckCircle2, AlertTriangle, Plus, ChevronsUpDown, ChevronRight, Check, Key, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Header: React.FC = () => {
@@ -200,19 +200,19 @@ export const Header: React.FC = () => {
 
       {/* Right Icons */}
       <div className="flex items-center gap-1 sm:gap-2.5">
-        {/* Ops AI Trigger Button */}
+        {/* Vein AI Trigger Button */}
         <button
           onClick={() => setIsOpsOpen(prev => !prev)}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
             isOpsOpen
-              ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 border-neutral-900 dark:border-neutral-100'
-              : 'border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-800/70 text-neutral-800 dark:text-neutral-200 hover:border-neutral-400'
+              ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-400/20'
+              : 'border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 hover:border-neutral-400 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-850'
           }`}
-          title="Open Ops AI Operational Manager (Cmd+J)"
+          title="Open Vein AI Operational Partner (Cmd+J)"
         >
-          <Bot className="w-3.5 h-3.5 text-neutral-900 dark:text-neutral-100" />
-          <span className="hidden xs:inline">Ops</span>
-          <kbd className="hidden sm:inline px-1 py-0.2 rounded text-[9px] font-mono bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-500">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="font-bold tracking-tight">Vein</span>
+          <kbd className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-500">
             ⌘J
           </kbd>
         </button>

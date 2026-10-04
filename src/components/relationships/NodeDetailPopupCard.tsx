@@ -353,8 +353,9 @@ export const NodeDetailPopupCard: React.FC<NodeDetailPopupCardProps> = ({
                   </p>
                 )}
                 {userEod.blockers && userEod.blockers.length > 0 && (
-                  <p className="text-[11px] text-neutral-800 dark:text-neutral-200 line-clamp-1 font-mono">
-                    ⚠️ {userEod.blockers[0]}
+                  <p className="text-[11px] text-neutral-800 dark:text-neutral-200 line-clamp-1 font-mono flex items-center gap-1 text-red-600 dark:text-red-400">
+                    <ShieldAlert className="w-3 h-3 shrink-0" />
+                    <span>{userEod.blockers[0]}</span>
                   </p>
                 )}
               </div>

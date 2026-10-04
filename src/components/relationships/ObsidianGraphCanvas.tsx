@@ -277,7 +277,7 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
         entityId: g.id,
         type: 'goal',
         label: g.title,
-        sublabel: `OKR • ${progress}%`,
+        sublabel: `Goal • ${progress}%`,
         progress,
         status: g.status,
         x: Math.cos(angle) * dist,
@@ -828,8 +828,8 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
                       strokeWidth={isSelected ? '3.5' : '2.5'}
                       className="drop-shadow-md"
                     />
-                    <text textAnchor="middle" dy="-2" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="monospace">
-                      {node.entityId.replace('proj-', 'PRJ-')}
+                    <text textAnchor="middle" dy="-2" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="monospace">
+                      {node.entityId.replace('proj-', 'PROJECT-')}
                     </text>
                     <text textAnchor="middle" dy="10" fill="#93C5FD" fontSize="8" fontFamily="monospace">
                       {node.status}
@@ -911,8 +911,8 @@ export const ObsidianGraphCanvas: React.FC<ObsidianGraphCanvasProps> = ({
                       stroke={isSelected ? '#FFFFFF' : '#EC4899'}
                       strokeWidth="2"
                     />
-                    <text textAnchor="middle" dy="-3" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="sans-serif">
-                      OKR
+                    <text textAnchor="middle" dy="-3" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="sans-serif">
+                      GOAL
                     </text>
                     <text textAnchor="middle" dy="9" fill="#F472B6" fontSize="8" fontWeight="bold" fontFamily="monospace">
                       {node.progress}%

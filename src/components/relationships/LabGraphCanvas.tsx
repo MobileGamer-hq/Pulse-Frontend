@@ -315,7 +315,7 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
         entityId: g.id,
         type: 'goal',
         label: g.title,
-        sublabel: `OKR • ${progress}%`,
+        sublabel: `Goal • ${progress}%`,
         progress,
         status: g.status,
         x: savedPos ? savedPos.x : Math.cos(angle) * dist,
@@ -539,14 +539,14 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
       updateTask(targetNode.entityId, { projectId: sourceNode.entityId });
       successMsg = `Moved task "${targetNode.label}" to project "${sourceNode.label}"`;
     }
-    // Task -> Goal (OKR Alignment)
+    // Task -> Goal (Goal Alignment)
     else if (sourceNode.type === 'task' && targetNode.type === 'goal') {
       updateTask(sourceNode.entityId, { linkedGoalId: targetNode.entityId });
-      successMsg = `Aligned task "${sourceNode.label}" to OKR "${targetNode.label}"`;
+      successMsg = `Aligned task "${sourceNode.label}" to Goal "${targetNode.label}"`;
     }
     else if (sourceNode.type === 'goal' && targetNode.type === 'task') {
       updateTask(targetNode.entityId, { linkedGoalId: sourceNode.entityId });
-      successMsg = `Aligned task "${targetNode.label}" to OKR "${sourceNode.label}"`;
+      successMsg = `Aligned task "${targetNode.label}" to Goal "${sourceNode.label}"`;
     }
     // Project -> Team (Multi-Team Assignment)
     else if (sourceNode.type === 'project' && targetNode.type === 'team') {
@@ -943,7 +943,7 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
       });
       setToastMessage(`Created project "${newProjTitle}" under ${targetTeam ? targetTeam.name : 'Team'}`);
     } else if (type === 'goal') {
-      const newGoalTitle = `New OKR Goal ${goals.length + 1}`;
+      const newGoalTitle = `New Goal ${goals.length + 1}`;
       addGoal({
         orgId: 'org-acme',
         title: newGoalTitle,
@@ -1055,7 +1055,7 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
                 className="w-full px-3 py-1.5 rounded-xl text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 font-medium"
               >
                 <Target className="w-4 h-4 text-rose-500" />
-                <span>New Goal OKR</span>
+                <span>New Goal</span>
               </button>
             </div>
           )}
@@ -1364,8 +1364,8 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
                       strokeWidth={isSelected ? '3.5' : '2.5'}
                       className="drop-shadow-md"
                     />
-                    <text textAnchor="middle" dy="-2" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="monospace">
-                      {node.entityId.replace('proj-', 'PRJ-')}
+                    <text textAnchor="middle" dy="-2" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="monospace">
+                      {node.entityId.replace('proj-', 'PROJECT-')}
                     </text>
                     <text textAnchor="middle" dy="10" fill="#93C5FD" fontSize="8" fontFamily="monospace">
                       {node.status}
@@ -1444,8 +1444,8 @@ export const LabGraphCanvas: React.FC<LabGraphCanvasProps> = ({
                       stroke={isSelected ? '#FFFFFF' : '#EC4899'}
                       strokeWidth="2"
                     />
-                    <text textAnchor="middle" dy="-3" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="sans-serif">
-                      OKR
+                    <text textAnchor="middle" dy="-3" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="sans-serif">
+                      GOAL
                     </text>
                     <text textAnchor="middle" dy="9" fill="#F472B6" fontSize="8" fontWeight="bold" fontFamily="monospace">
                       {node.progress}%

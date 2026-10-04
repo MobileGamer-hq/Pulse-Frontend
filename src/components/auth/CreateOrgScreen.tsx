@@ -119,7 +119,7 @@ export const CreateOrgScreen: React.FC = () => {
     {
       id: 'MarketingCampaign',
       title: 'Sales & Pipeline',
-      desc: 'Structured for lead progression, CRM integration, and forecasting.',
+      desc: 'Structured for lead progression, customer relationship management integration, and forecasting.',
       icon: TrendingUp
     },
     {
@@ -163,7 +163,7 @@ export const CreateOrgScreen: React.FC = () => {
             }`}>
               1
             </span>
-            <span className="font-semibold">Org Profile</span>
+            <span className="font-semibold">Organization Profile</span>
           </div>
 
           <div className="h-px bg-neutral-300 dark:bg-neutral-800 flex-1 mx-4" />

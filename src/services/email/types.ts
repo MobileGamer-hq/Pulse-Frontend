@@ -37,6 +37,7 @@ export interface EmailServiceConfig {
   provider: EmailProviderType;
   backend: {
     apiUrl: string;
+    backupApiUrl?: string;
   };
 }
 

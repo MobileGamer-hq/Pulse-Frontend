@@ -216,15 +216,15 @@ export const DailyPulseScreen: React.FC = () => {
   const getEnergyBadge = (energy: number) => {
     switch (energy) {
       case 5:
-        return { label: '⚡ Peak (5/5)', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' };
+        return { label: 'Peak (5/5)', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' };
       case 4:
-        return { label: '⚡ High (4/5)', style: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900' };
+        return { label: 'High (4/5)', style: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900' };
       case 3:
-        return { label: '⚡ Steady (3/5)', style: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-900' };
+        return { label: 'Steady (3/5)', style: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-900' };
       case 2:
-        return { label: '⚡ Low (2/5)', style: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-900' };
+        return { label: 'Low (2/5)', style: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-900' };
       default:
-        return { label: '⚡ Critical (1/5)', style: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-900' };
+        return { label: 'Critical (1/5)', style: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-900' };
     }
   };
 
@@ -819,13 +819,13 @@ export const DailyPulseScreen: React.FC = () => {
                   <ul className="space-y-1 text-neutral-600 dark:text-neutral-300 text-[11px] font-sans">
                     {tasks.filter(t => selectedCompletedTaskIds.includes(t.id)).map(t => (
                       <li key={t.id} className="flex items-center gap-1.5">
-                        <span className="text-emerald-500 font-bold">✓</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         <span>[Task] {t.title}</span>
                       </li>
                     ))}
                     {accomplishments.map((acc, idx) => (
                       <li key={idx} className="flex items-center gap-1.5">
-                        <span className="text-emerald-500 font-bold">✓</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         <span>{acc}</span>
                       </li>
                     ))}
@@ -860,9 +860,10 @@ export const DailyPulseScreen: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3 pt-2 font-mono">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex-1 py-3 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer transition-colors"
+                  className="flex-1 py-3 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer transition-colors flex items-center justify-center gap-2"
                 >
-                  ✏️ Edit Submission
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit Submission
                 </button>
                 <button
                   onClick={() => setActiveView('feed')}
@@ -1065,7 +1066,7 @@ export const DailyPulseScreen: React.FC = () => {
                         <ul className="space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300 font-sans">
                           {entry.accomplishments.map((acc, aIdx) => (
                             <li key={aIdx} className="flex items-start gap-2">
-                              <span className="text-emerald-500 font-bold shrink-0 mt-0.5">✓</span>
+                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                               <span className="leading-relaxed">{acc}</span>
                             </li>
                           ))}

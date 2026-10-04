@@ -21,10 +21,12 @@ interface ActionStep {
 
 interface ResultChip {
   id: string;
+  type?: 'task' | 'project';
   title: string;
   status: string;
   dueDate?: string;
   priority?: string;
+  subtitle?: string;
 }
 
 interface Message {
@@ -78,6 +80,22 @@ const formatActionLabel = (act: ActionCall): string => {
   switch (act.tool) {
     case 'query_team_state':
       return 'Checking team status and roster';
+    case 'query_projects':
+      return 'Checking active projects';
+    case 'query_project_tasks':
+      return p.project_name ? `Checking tasks for "${p.project_name}"` : 'Checking project tasks';
+    case 'create_project':
+      return p.name ? `Creating project "${p.name}"` : 'Creating new project';
+    case 'move_task_project':
+      return p.task_id || p.title ? `Moving task to "${p.project_name || 'project'}"` : 'Moving task to project';
+    case 'add_subtask':
+      return p.title ? `Adding subtask "${p.title}"` : 'Adding subtask';
+    case 'update_subtask': {
+      const st = p.subtask_title || p.title || '';
+      return p.done === true
+        ? (st ? `Completing subtask "${st}"` : 'Completing subtask')
+        : (st ? `Updating subtask "${st}"` : 'Updating subtask');
+    }
     case 'analyze_dependencies':
       return 'Analyzing task dependencies';
     case 'audit_sprint':
@@ -146,6 +164,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   const [undoStatus, setUndoStatus] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => 'sess_' + Math.random().toString(36).substring(2, 10));
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Typewriter animation queue
@@ -157,8 +176,35 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   } | null>(null);
   const typewriterCurrentRef = useRef<string>('');
 
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  };
+
+  // Scroll to the very bottom whenever the drawer is opened
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isOpen) {
+      scrollToBottom('auto');
+      const t1 = setTimeout(() => scrollToBottom('auto'), 40);
+      const t2 = setTimeout(() => scrollToBottom('smooth'), 140);
+      const t3 = setTimeout(() => scrollToBottom('smooth'), 300);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    scrollToBottom('smooth');
   }, [messages, isStreaming]);
 
   // Smooth Typewriter Loop: reveals text word-by-word at ~28ms cadence
@@ -228,8 +274,28 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
       const act = actions[i];
       const res = results[i];
 
-      // Only task-mutating actions (create, update, resolve_blocker) should produce result chips
-      if (!['create_task', 'update_task', 'resolve_blocker'].includes(act.tool)) {
+      // Project creation produces project result chips
+      if (act.tool === 'create_project' && res && res.status === 'success') {
+        const projName = res.data?.projectName || act.parameters?.name || '';
+        const projId = res.data?.projectId || projName;
+        const normTitle = projName.toLowerCase().trim();
+        if (normTitle && !seenTitles.has(normTitle)) {
+          seenTitles.add(normTitle);
+          if (projId) seenIds.add(projId);
+          chips.push({
+            id: projId,
+            type: 'project',
+            title: projName,
+            status: res.data?.status || 'Active',
+            dueDate: res.data?.targetEndDate,
+            subtitle: res.data?.teamName ? `Team: ${res.data.teamName}` : 'Project',
+          });
+        }
+        continue;
+      }
+
+      // Task-mutating actions produce task result chips
+      if (!['create_task', 'update_task', 'resolve_blocker', 'move_task_project', 'add_subtask', 'update_subtask'].includes(act.tool)) {
         continue;
       }
 
@@ -258,10 +324,12 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
 
         chips.push({
           id: finalId || finalTitle,
+          type: 'task',
           title: finalTitle,
           status: matchedTask?.status || 'Todo',
           dueDate: matchedTask?.dueDate || res.data?.dueDate || act.parameters?.due_date,
           priority: matchedTask?.priority || act.parameters?.priority,
+          subtitle: res.data?.projectName ? `Project: ${res.data.projectName}` : undefined,
         });
       }
     }
@@ -402,12 +470,23 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
       }),
 
       // Projects
-      projects: (projects || []).map(p => ({
-        id: p.id,
-        name: p.name,
-        status: p.status,
-        targetDate: p.targetEndDate || p.startDate,
-      })),
+      projects: (projects || []).map(p => {
+        const prTasks = (tasks || []).filter(
+          t => t.projectId === p.id || (t.projectName && t.projectName.toLowerCase() === p.name.toLowerCase())
+        );
+        return {
+          id: p.id,
+          name: p.name,
+          status: p.status || 'Active',
+          leadName: p.leadName || 'Unassigned',
+          teamName: p.teamName || 'Unassigned',
+          targetDate: p.targetEndDate || p.startDate,
+          totalTasks: prTasks.length,
+          completedTasks: prTasks.filter(t => t.status === 'Done').length,
+          activeTasks: prTasks.filter(t => t.status === 'InProgress' || t.status === 'Todo').length,
+          blockedTasks: prTasks.filter(t => t.status === 'Blocked' || !!t.blockedReason).length,
+        };
+      }),
 
       // Recent Daily Pulses
       recentDailyPulses: (eodEntries || []).slice(0, 15).map(e => ({
@@ -453,9 +532,11 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         id: t.id,
         title: t.title,
         status: t.status,
+        projectName: t.projectName,
+        priority: t.priority,
         assigneeName: (users || []).find(u => (t.assigneeIds || []).includes(u.id))?.name || 'Unassigned',
         dueDate: t.dueDate,
-        priority: t.priority,
+        subtasks: (t.subtasks || []).map(s => `${s.title} [${s.done ? 'Done' : 'Pending'}]`),
         subtasksCount: t.subtasks?.length || 0,
       })),
     };
@@ -700,7 +781,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         )}
 
         {/* Messages Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs font-sans">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-5 text-xs font-sans">
           {messages.map((m) => {
             if (m.sender === 'user') {
               return (
@@ -786,10 +867,16 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                           key={chip.id}
                           chip={chip}
                           onToggleStatus={handleToggleTask}
-                          onOpenDetail={(id) => {
-                            const matched = tasks.find(t => t.id === id || t.title.toLowerCase() === chip.title.toLowerCase());
-                            const finalTaskId = matched?.id || id;
-                            pushPanel({ type: 'task', id: finalTaskId });
+                          onOpenDetail={(id, type) => {
+                            if (type === 'project') {
+                              const matched = projects.find(p => p.id === id || p.name.toLowerCase() === chip.title.toLowerCase());
+                              const finalProjId = matched?.id || id;
+                              pushPanel({ type: 'project', id: finalProjId });
+                            } else {
+                              const matched = tasks.find(t => t.id === id || t.title.toLowerCase() === chip.title.toLowerCase());
+                              const finalTaskId = matched?.id || id;
+                              pushPanel({ type: 'task', id: finalTaskId });
+                            }
                             onClose();
                           }}
                         />
@@ -949,40 +1036,54 @@ const CollapsibleActionTimeline: React.FC<{
 const InteractiveResultChip: React.FC<{
   chip: ResultChip;
   onToggleStatus: (id: string, currentStatus: string) => void;
-  onOpenDetail: (id: string) => void;
+  onOpenDetail: (id: string, type?: 'task' | 'project') => void;
 }> = ({ chip, onToggleStatus, onOpenDetail }) => {
   const isDone = chip.status === 'Done';
+  const isProject = chip.type === 'project';
 
   return (
     <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all shadow-2xs group">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleStatus(chip.id, chip.status);
-        }}
-        className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-          isDone
-            ? 'bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900'
-            : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-500'
-        }`}
-        title={isDone ? 'Mark as Todo' : 'Mark as Done'}
-      >
-        {isDone && <Check className="w-2.5 h-2.5" />}
-      </button>
+      {isProject ? (
+        <div className="w-5 h-5 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-400 shrink-0">
+          <Layers className="w-3 h-3" />
+        </div>
+      ) : (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleStatus(chip.id, chip.status);
+          }}
+          className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+            isDone
+              ? 'bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900'
+              : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-500'
+          }`}
+          title={isDone ? 'Mark as Todo' : 'Mark as Done'}
+        >
+          {isDone && <Check className="w-2.5 h-2.5" />}
+        </button>
+      )}
 
       <div
-        onClick={() => onOpenDetail(chip.id)}
+        onClick={() => onOpenDetail(chip.id, chip.type)}
         className="flex-1 min-w-0 flex items-center justify-between gap-2 cursor-pointer"
       >
-        <span
-          className={`text-xs font-semibold truncate ${
-            isDone
-              ? 'line-through text-neutral-400 dark:text-neutral-500'
-              : 'text-neutral-800 dark:text-neutral-200'
-          }`}
-        >
-          {chip.title}
-        </span>
+        <div className="min-w-0 flex flex-col">
+          <span
+            className={`text-xs font-semibold truncate ${
+              isDone
+                ? 'line-through text-neutral-400 dark:text-neutral-500'
+                : 'text-neutral-800 dark:text-neutral-200'
+            }`}
+          >
+            {chip.title}
+          </span>
+          {chip.subtitle && (
+            <span className="text-[10px] text-neutral-400 truncate">
+              {chip.subtitle}
+            </span>
+          )}
+        </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {chip.dueDate && (

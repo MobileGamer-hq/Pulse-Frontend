@@ -6,6 +6,17 @@ import {
   Edit2, Check, AlertTriangle
 } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
+import type { Role } from '../../types';
+
+const AVAILABLE_ROLES: { role: Role; label: string; desc: string }[] = [
+  { role: 'Admin', label: 'Admin', desc: 'Full workspace control, billing, tags, and settings' },
+  { role: 'Executive', label: 'Executive', desc: 'Company-wide strategic visibility, goals & analytics' },
+  { role: 'HR', label: 'Human Resources', desc: 'Team health, capacity planning, and member onboarding' },
+  { role: 'Manager', label: 'Manager', desc: 'Squad lifecycle, blocker resolution, and task allocation' },
+  { role: 'TeamLead', label: 'Team Lead', desc: 'Sprint execution, team coordination, and reviews' },
+  { role: 'Member', label: 'Member', desc: 'Daily task execution, check-ins, and comments' },
+  { role: 'Contractor', label: 'Contractor', desc: 'Scoped project and task access with capacity limits' },
+];
 
 interface PersonProfilePanelProps {
   id: string;
@@ -37,12 +48,23 @@ export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) =>
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
   const [capacityInput, setCapacityInput] = useState(user.capacityHoursPerWeek || workloadSettings.standardWeeklyHours);
 
+  // Privileged edit state for Job Title & Role
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(user.title || '');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [isSavingRole, setIsSavingRole] = useState(false);
+
   React.useEffect(() => {
     setCapacityInput(user.capacityHoursPerWeek || workloadSettings.standardWeeklyHours);
   }, [user.capacityHoursPerWeek, workloadSettings.standardWeeklyHours]);
 
+  React.useEffect(() => {
+    setTitleInput(user.title || '');
+  }, [user.title]);
+
   const canManageCapacity = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
   const canManageTeams = ['Admin', 'Manager', 'HR'].includes(activeRole || currentUser?.role || '');
+  const canEditMember = ['Admin', 'Executive', 'Manager', 'HR'].includes(activeRole || currentUser?.role || '');
 
   const handleSaveCapacity = () => {
     const num = Number(capacityInput);
@@ -50,6 +72,33 @@ export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) =>
       updateUser(user.id, { capacityHoursPerWeek: num });
     }
     setIsEditingCapacity(false);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!titleInput.trim()) return;
+    setIsSavingTitle(true);
+    try {
+      await updateUser(user.id, { title: titleInput.trim() });
+      setIsEditingTitle(false);
+    } catch (err) {
+      console.error('Failed to update job title:', err);
+      alert('Failed to update job title. Please try again.');
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
+  const handleSaveRole = async (newRole: Role) => {
+    if (!canEditMember) return;
+    setIsSavingRole(true);
+    try {
+      await updateUser(user.id, { role: newRole });
+    } catch (err) {
+      console.error('Failed to update role:', err);
+      alert('Failed to update role. Please try again.');
+    } finally {
+      setIsSavingRole(false);
+    }
   };
 
   // Real data calculations
@@ -98,7 +147,53 @@ export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) =>
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5 font-mono text-xs text-neutral-500">
-              <span>{user.title || user.role || 'Member'}</span>
+              {isEditingTitle ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTitle();
+                      if (e.key === 'Escape') setIsEditingTitle(false);
+                    }}
+                    placeholder="Job title"
+                    className="px-2 py-0.5 text-xs font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-hidden"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveTitle}
+                    disabled={isSavingTitle}
+                    className="p-1 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-80 cursor-pointer"
+                    title="Save title"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTitleInput(user.title || '');
+                      setIsEditingTitle(false);
+                    }}
+                    className="p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                    title="Cancel"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 group/title">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200">{user.title || user.role || 'Member'}</span>
+                  {canEditMember && (
+                    <button
+                      onClick={() => setIsEditingTitle(true)}
+                      className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-opacity cursor-pointer"
+                      title="Edit job title"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
               <span>•</span>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                 isOverbooked 
@@ -193,10 +288,31 @@ export const PersonProfilePanel: React.FC<PersonProfilePanelProps> = ({ id }) =>
       {/* Role & Team Affiliations */}
       <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-xs text-neutral-400 uppercase tracking-wider font-mono">Workspace Permissions</h3>
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-            {user.role} Scope
-          </span>
+          <div>
+            <h3 className="font-bold text-xs text-neutral-400 uppercase tracking-wider font-mono">Workspace Permissions</h3>
+            <p className="text-[10px] text-neutral-400 font-sans mt-0.5">Workspace role and access control level</p>
+          </div>
+          {canEditMember ? (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={user.role}
+                disabled={isSavingRole}
+                onChange={(e) => handleSaveRole(e.target.value as Role)}
+                className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700 cursor-pointer focus:outline-hidden hover:border-neutral-400 transition-colors"
+                title="Change workspace role"
+              >
+                {AVAILABLE_ROLES.map(({ role, label }) => (
+                  <option key={role} value={role}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+              {user.role} Scope
+            </span>
+          )}
         </div>
 
         <div className="space-y-3">

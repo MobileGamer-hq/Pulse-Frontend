@@ -15,6 +15,7 @@ export interface CreateTaskPayload {
   subtasks?: Array<{ title: string; done?: boolean } | string>;
   dependsOnTaskIds?: string[];
   blockedReason?: string;
+  isPrivate?: boolean;
 }
 
 export interface UpdateTaskPayload {
@@ -31,6 +32,7 @@ export interface UpdateTaskPayload {
   assigneeIds?: string[];
   tagIds?: string[];
   projectId?: string;
+  isPrivate?: boolean;
 }
 
 export const taskService = {
@@ -95,7 +97,7 @@ export const taskService = {
     }
 
     const taskId = crypto.randomUUID();
-    const taskRow = {
+    const taskRow: Record<string, any> = {
       id: taskId,
       org_id: orgId,
       project_id: finalProjectId,
@@ -110,13 +112,26 @@ export const taskService = {
       linked_goal_id: payload.linkedGoalId && isUuid(payload.linkedGoalId) ? payload.linkedGoalId : null,
       blocked_reason: payload.blockedReason || null,
       created_by: userId,
+      is_private: payload.isPrivate ?? false,
     };
 
-    const { data: createdTask, error: taskError } = await supabase
+    let { data: createdTask, error: taskError } = await supabase
       .from('tasks')
       .insert(taskRow)
       .select('*, project:projects(id, name)')
       .single();
+
+    if (taskError && taskError.message?.toLowerCase().includes('is_private')) {
+      // Column is_private may not exist yet in Supabase schema, retry without it
+      const { is_private: _, ...fallbackRow } = taskRow;
+      const fallbackResult = await supabase
+        .from('tasks')
+        .insert(fallbackRow)
+        .select('*, project:projects(id, name)')
+        .single();
+      createdTask = fallbackResult.data;
+      taskError = fallbackResult.error;
+    }
 
     if (taskError) {
       console.error('[taskService.createTask] Supabase task error:', taskError);
@@ -181,6 +196,8 @@ export const taskService = {
         startDate: createdTask.start_date,
         linkedGoalId: createdTask.linked_goal_id,
         blockedReason: createdTask.blocked_reason,
+        isPrivate: Boolean(createdTask.is_private ?? payload.isPrivate ?? false),
+        createdBy: createdTask.created_by || userId,
         createdAt: createdTask.created_at,
         updatedAt: createdTask.updated_at,
         assignees: (payload.assigneeIds || []).map(uid => ({ userId: uid })),
@@ -210,17 +227,30 @@ export const taskService = {
     if (payload.actualHours !== undefined) updates.actual_hours = payload.actualHours;
     if (payload.estimatedHours !== undefined) updates.estimated_hours = payload.estimatedHours;
     if (payload.blockedReason !== undefined) updates.blocked_reason = payload.blockedReason;
-    if (payload.startDate !== undefined) updates.start_date = payload.startDate;
-    if (payload.dueDate !== undefined) updates.due_date = payload.dueDate;
+    if (payload.startDate !== undefined) updates.start_date = payload.startDate || null;
+    if (payload.dueDate !== undefined) updates.due_date = payload.dueDate || null;
     if (payload.linkedGoalId !== undefined) updates.linked_goal_id = payload.linkedGoalId;
     if (payload.projectId !== undefined) updates.project_id = payload.projectId;
+    if (payload.isPrivate !== undefined) updates.is_private = payload.isPrivate;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('tasks')
       .update(updates)
       .eq('id', taskId)
       .select()
       .single();
+
+    if (error && error.message?.toLowerCase().includes('is_private')) {
+      const { is_private: _, ...fallbackUpdates } = updates;
+      const retry = await supabase
+        .from('tasks')
+        .update(fallbackUpdates)
+        .eq('id', taskId)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.warn('[taskService.updateTask] Error:', error);

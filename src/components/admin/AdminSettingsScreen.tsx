@@ -11,6 +11,17 @@ import {
   CheckCircle2, Lock, Zap
 } from 'lucide-react';
 import { webhooksService } from '../../services/webhooksService';
+import type { Role } from '../../types';
+
+const AVAILABLE_ROLES: { role: Role; label: string }[] = [
+  { role: 'Admin', label: 'Admin' },
+  { role: 'Executive', label: 'Executive' },
+  { role: 'HR', label: 'Human Resources' },
+  { role: 'Manager', label: 'Manager' },
+  { role: 'TeamLead', label: 'Team Lead' },
+  { role: 'Member', label: 'Member' },
+  { role: 'Contractor', label: 'Contractor' },
+];
 
 const getDetectedTimeZone = (): string => {
   try {
@@ -54,7 +65,7 @@ const COMMON_TIMEZONES = [
 export const AdminSettingsScreen: React.FC = () => {
   const { 
     isDarkMode, setIsDarkMode, pushPanel, tags, reorderTags, addTag, updateTag, deleteTag,
-    currentUser, currentOrgSlug, currentOrgName, activeRole, users,
+    currentUser, currentOrgSlug, currentOrgName, activeRole, users, updateUser,
     workloadSettings, updateWorkloadSettings, resetWorkloadSettings
   } = useApp();
 
@@ -140,6 +151,7 @@ export const AdminSettingsScreen: React.FC = () => {
   const isCompanyAdmin = ['Admin', 'Executive', 'Manager'].includes(activeRole);
   const isBillingAllowed = ['Admin', 'Executive'].includes(activeRole);
   const isRBACAllowed = ['Admin', 'Executive', 'HR'].includes(activeRole);
+  const canEditMember = ['Admin', 'Executive', 'Manager', 'HR'].includes(activeRole || currentUser?.role || '');
 
   const location = useLocation();
 
@@ -331,7 +343,7 @@ export const AdminSettingsScreen: React.FC = () => {
                   : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
             >
-              <Shield className="w-3.5 h-3.5" /> RBAC &amp; Roles
+              <Shield className="w-3.5 h-3.5" /> Role Permissions
             </button>
           )}
 
@@ -1093,7 +1105,7 @@ export const AdminSettingsScreen: React.FC = () => {
               </h1>
               <p className="text-xs text-neutral-500 font-mono mt-0.5">
                 {companySubTab === 'profile' && 'Manage organization identity, domain slug, and regional localization.'}
-                {companySubTab === 'security' && 'Manage authentication policies, 2FA enforcement, and SSO integrations.'}
+                {companySubTab === 'security' && 'Manage authentication policies, two-factor authentication, and single sign-on integrations.'}
                 {companySubTab === 'billing' && 'Pulse Early Access Beta — All features 100% free with unlimited seats.'}
                 {companySubTab === 'integrations' && 'Manage custom webhooks, REST API keys, and third-party integrations.'}
                 {companySubTab === 'audit' && 'Real-time security audit trails and organization administrative events.'}
@@ -1480,7 +1492,7 @@ export const AdminSettingsScreen: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 font-sans">Single Sign-On (SSO &amp; SAML 2.0)</h3>
+                          <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 font-sans">Single Sign-On (SAML 2.0)</h3>
                           <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 uppercase">
                             Coming Soon in Production
                           </span>
@@ -1496,8 +1508,8 @@ export const AdminSettingsScreen: React.FC = () => {
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">Preview</span>
                         </div>
                         <p className="text-[10px] text-neutral-400 font-sans">OAuth2 &amp; Google Cloud Directory sync.</p>
-                        <button onClick={() => alert('Google SSO integration will be enabled in Pulse 1.0 Production release.')} className="w-full py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
-                          Configure SSO (Soon)
+                        <button onClick={() => alert('Google Single Sign-On integration will be enabled in Pulse 1.0 Production release.')} className="w-full py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
+                          Configure Single Sign-On (Soon)
                         </button>
                       </div>
 
@@ -1508,7 +1520,7 @@ export const AdminSettingsScreen: React.FC = () => {
                         </div>
                         <p className="text-[10px] text-neutral-400 font-sans">Enterprise Okta single sign-on &amp; SCIM.</p>
                         <button onClick={() => alert('Okta SAML 2.0 integration will be enabled in Pulse 1.0 Production release.')} className="w-full py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
-                          Configure SAML (Soon)
+                          Configure Single Sign-On (Soon)
                         </button>
                       </div>
 
@@ -1517,7 +1529,7 @@ export const AdminSettingsScreen: React.FC = () => {
                           <span className="font-bold text-xs font-sans text-neutral-900 dark:text-neutral-100">Microsoft Entra ID</span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">Preview</span>
                         </div>
-                        <p className="text-[10px] text-neutral-400 font-sans">Azure AD SSO and conditional access.</p>
+                        <p className="text-[10px] text-neutral-400 font-sans">Azure Active Directory Single Sign-On and conditional access.</p>
                         <button onClick={() => alert('Microsoft Entra ID integration will be enabled in Pulse 1.0 Production release.')} className="w-full py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
                           Configure Entra (Soon)
                         </button>
@@ -1532,7 +1544,7 @@ export const AdminSettingsScreen: React.FC = () => {
                     <div className="space-y-4 divide-y divide-neutral-100 dark:divide-neutral-800 font-mono">
                       <div className="flex items-center justify-between pt-2">
                         <div>
-                          <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-sans">Require Two-Factor Auth (2FA)</div>
+                          <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-sans">Require Two-Factor Authentication</div>
                           <p className="text-[10px] text-neutral-400 font-sans">Mandate TOTP authenticator setup for all workspace members upon next login.</p>
                         </div>
                         <button 
@@ -1642,7 +1654,7 @@ export const AdminSettingsScreen: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2 text-neutral-200">
                         <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>Strategic OKRs &amp; Goal Progress Tracking</span>
+                        <span>Strategic Goals &amp; Progress Tracking</span>
                       </div>
                       <div className="flex items-center gap-2 text-neutral-200">
                         <Check className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1689,7 +1701,7 @@ export const AdminSettingsScreen: React.FC = () => {
                           <span className="font-bold text-xs font-sans text-neutral-900 dark:text-neutral-100">Pro Team</span>
                         </div>
                         <div className="text-xl font-bold font-sans text-neutral-900 dark:text-neutral-100">$19<span className="text-xs text-neutral-400 font-normal"> / seat / mo</span></div>
-                        <p className="text-[10px] text-neutral-500 font-sans">Unlimited projects, advanced OKR tracking, executive summaries &amp; webhooks.</p>
+                        <p className="text-[10px] text-neutral-500 font-sans">Unlimited projects, advanced goal tracking, executive summaries &amp; webhooks.</p>
                       </div>
 
                       <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/40 space-y-3">
@@ -1698,7 +1710,7 @@ export const AdminSettingsScreen: React.FC = () => {
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold">Custom</span>
                         </div>
                         <div className="text-xl font-bold font-sans text-neutral-900 dark:text-neutral-100">Contact Us</div>
-                        <p className="text-[10px] text-neutral-500 font-sans">Custom SSO, dedicated audit logs, SIEM export, and SLA guarantees.</p>
+                        <p className="text-[10px] text-neutral-500 font-sans">Custom Single Sign-On, dedicated audit logs, security event export, and uptime guarantees.</p>
                       </div>
                     </div>
                   </div>
@@ -1724,7 +1736,7 @@ export const AdminSettingsScreen: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <input
                           type="text"
-                          placeholder="Webhook Name (e.g. CI/CD Deploy Alert)"
+                          placeholder="Webhook Name (e.g. Continuous Deployment Alert)"
                           value={newWebhookName}
                           onChange={e => setNewWebhookName(e.target.value)}
                           className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
@@ -1973,7 +1985,7 @@ export const AdminSettingsScreen: React.FC = () => {
             <div>
               <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">SETTINGS &gt; ACCESS CONTROL</span>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight font-sans mt-0.5">
-                RBAC &amp; Roles
+                Role Permissions
               </h1>
               <p className="text-xs text-neutral-500">Manage organizational roles, define granular permissions, and govern access.</p>
             </div>
@@ -1985,7 +1997,7 @@ export const AdminSettingsScreen: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5" /> Audit Log
               </button>
-              <button onClick={() => alert('Creating new RBAC role...')} className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer">
+              <button onClick={() => alert('Creating new role permission...')} className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer">
                 <Plus className="w-3.5 h-3.5" /> New Role
               </button>
             </div>
@@ -2010,7 +2022,7 @@ export const AdminSettingsScreen: React.FC = () => {
                       <th className="pb-2">Role Name</th>
                       <th className="pb-2 text-center">Tasks</th>
                       <th className="pb-2 text-center">Projects</th>
-                      <th className="pb-2 text-center">OKRs</th>
+                      <th className="pb-2 text-center">Goals</th>
                       <th className="pb-2 text-center">Analytics</th>
                       <th className="pb-2 text-center">Billing</th>
                     </tr>
@@ -2051,17 +2063,57 @@ export const AdminSettingsScreen: React.FC = () => {
                     </div>
                   ) : (
                     users.map(u => (
-                      <div key={u.id} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
+                      <div 
+                        key={u.id} 
+                        className="flex items-center justify-between text-xs p-2 -mx-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors group"
+                      >
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                          onClick={() => pushPanel({ type: 'person', id: u.id })}
+                          title="View user profile"
+                        >
                           <UserAvatar name={u.name} avatarUrl={u.avatarUrl} size="xs" />
-                          <div>
-                            <span className="font-bold block">{u.name}</span>
-                            <span className="text-[10px] text-neutral-400 font-mono">{u.email}</span>
+                          <div className="truncate">
+                            <span className="font-bold block truncate text-neutral-900 dark:text-neutral-100 hover:underline">{u.name}</span>
+                            <span className="text-[10px] text-neutral-400 font-mono block truncate">{u.title || u.email}</span>
                           </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 uppercase">
-                          {u.role || 'MEMBER'}
-                        </span>
+
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          {canEditMember ? (
+                            <select
+                              value={u.role || 'Member'}
+                              onChange={async (e) => {
+                                e.stopPropagation();
+                                const newRole = e.target.value as Role;
+                                await updateUser(u.id, { role: newRole });
+                                recordAuditLog('Update User Role', `${u.name} -> ${newRole}`);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 cursor-pointer focus:outline-hidden hover:border-neutral-400 transition-colors"
+                              title="Change user role"
+                            >
+                              {AVAILABLE_ROLES.map(r => (
+                                <option key={r.role} value={r.role}>
+                                  {r.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 uppercase">
+                              {u.role || 'MEMBER'}
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => pushPanel({ type: 'person', id: u.id })}
+                            className="p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="View member profile"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -2103,7 +2155,7 @@ export const AdminSettingsScreen: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input
                   type="text"
-                  placeholder="Webhook Name (e.g. CI/CD Deploy Alert)"
+                  placeholder="Webhook Name (e.g. Continuous Deployment Alert)"
                   value={newWebhookName}
                   onChange={e => setNewWebhookName(e.target.value)}
                   className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs focus:outline-none"
@@ -2293,7 +2345,7 @@ export const AdminSettingsScreen: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 text-neutral-200">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Strategic OKRs &amp; Goal Progress Tracking</span>
+                  <span>Strategic Goals &amp; Progress Tracking</span>
                 </div>
                 <div className="flex items-center gap-2 text-neutral-200">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />

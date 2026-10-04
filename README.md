@@ -14,8 +14,8 @@ Pulse solves the fragmentation between high-level executive strategy and daily i
 
 #### 1. 🎭 Role-Based Access & Simulation Mode
 Pulse features a built-in **Role Switcher** at the top of the interface allowing users and managers to experience the app from different organizational perspectives:
-- **Executive / Director**: Focuses on company-wide Pulse Scores, OKR alignment, portfolio health, and high-level blocker summaries.
-- **Engineering Manager / Team Lead**: Focuses on team velocity, daily check-in (EOD) submissions, resolving flagged blockers, and task delegation.
+- **Executive / Director**: Focuses on company-wide Pulse Scores, goal alignment, portfolio health, and high-level blocker summaries.
+- **Engineering Manager / Team Lead**: Focuses on team velocity, daily check-in submissions, resolving flagged blockers, and task delegation.
 - **Individual Contributor**: Focuses on personal task queues, daily pulse check-ins, project contributions, and peer collaboration.
 - **Admin**: Manages system privileges, role matrix configurations, tags, and workspace settings.
 
@@ -29,9 +29,9 @@ Explore your organization as a living, interconnected ecosystem:
 
 ---
 
-#### 3. ⏱️ Daily Pulse Check-ins (EOD Tracking)
+#### 3. ⏱️ Daily Pulse Check-ins (Daily Tracking)
 Eliminate long, repetitive standup meetings with asynchronous daily check-ins:
-- **Quick EOD Submission**: Share what you accomplished today, planned tasks for tomorrow, and confidence ratings.
+- **Quick Daily Submission**: Share what you accomplished today, planned tasks for tomorrow, and confidence ratings.
 - **Manager Blocker Flagging**: Instantly flag critical blockers directly to your manager for immediate assistance.
 - **Daily Digest**: View team-wide updates at a glance.
 
@@ -40,7 +40,7 @@ Eliminate long, repetitive standup meetings with asynchronous daily check-ins:
 #### 4. 📋 Execution Hub (Tasks, Projects & Goals)
 - **Task Management**: Create, assign, filter, and track tasks across different states (*To Do*, *In Progress*, *In Review*, *Done*, *Blocked*).
 - **Projects & Milestones**: Monitor project status, budget allocation, owner assignments, and completion percentages.
-- **Strategic OKRs & Goals**: Link day-to-day tasks directly to key business objectives to ensure every task drives measurable impact.
+- **Strategic Goals & Key Results**: Link day-to-day tasks directly to key business objectives to ensure every task drives measurable impact.
 
 ---
 

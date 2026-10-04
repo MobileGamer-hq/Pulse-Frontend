@@ -6,15 +6,15 @@
 ## 1. Executive Overview
 
 ### What is Pulse?
-**Pulse** is a modern, enterprise-grade **Team Alignment & Execution Engine** designed to bridge the gap between high-level company strategy (OKRs), project execution, and daily ground-level engineering realities. 
+**Pulse** is a modern, enterprise-grade **Team Alignment & Execution Engine** designed to bridge the gap between high-level company strategy (strategic goals), project execution, and daily ground-level engineering realities. 
 
 Traditional project management tools (like Jira, Asana, or Monday.com) often devolve into administrative chore boards disconnected from strategic outcomes, while goal-tracking platforms (like Workboard or Lattice) stay isolated from day-to-day work. 
 
 **Pulse unifies both worlds into a single, high-fidelity system:**
-- **Bidirectional Traceability**: Connects company-wide strategic Objectives & Key Results (OKRs) directly to projects, tasks, squads, and individual contributors.
+- **Bidirectional Traceability**: Connects company-wide strategic Goals & Key Results directly to projects, tasks, squads, and individual contributors.
 - **Asynchronous Daily Pulse & Bottleneck Engine**: Replaces time-consuming synchronous standups with high-signal daily check-ins that surface blockers, manager escalations, and accomplishment tracking in real time.
 - **Multi-Dimensional Org Topology (Spider Web & Master-Detail Carousel)**: Interactive force-directed relationship graphs and master-detail carousels that visualize cross-team dependencies, multi-squad projects, and resource allocations at a glance.
-- **Multi-Tenant Governance & RBAC**: Built from the ground up for modern businesses, multi-entity corporations, and agencies with isolated tenant workspaces, custom domain routing, role-based access control, and governed taxonomy tags.
+- **Multi-Tenant Governance & Access Control**: Built from the ground up for modern businesses, multi-entity corporations, and agencies with isolated tenant workspaces, custom domain routing, role-based access control, and governed taxonomy tags.
 
 ---
 
@@ -36,10 +36,10 @@ Traditional project management tools (like Jira, Asana, or Monday.com) often dev
 - **Multi-Tenant Workspace Switcher**: Seamlessly toggle between multiple independent organizations or subsidiaries with isolated data stores, members, and projects.
 - **Organization Creation & Onboarding Wizard**: Self-serve organization creation with industry-tailored starter templates and squad presets.
 - **Waiting Room & Approval Gate**: Security gate for prospective members joining via invite links or org codes, requiring Admin/Manager approval before accessing confidential workspaces.
-- **7-Tier Role-Based Access Control (RBAC)**:
+- **7-Tier Role-Based Permissions & Access Control**:
   - `Admin`: Full workspace control, billing, member approval, tag governance, and org settings.
-  - `Executive`: Company-wide visibility, OKR creation, executive dashboard, and analytics export.
-  - `HR / People Ops`: Headcount management, capacity planning, team health overview, and check-in audits.
+  - `Executive`: Company-wide visibility, goal creation, executive dashboard, and analytics export.
+  - `Human Resources / People Ops`: Headcount management, capacity planning, team health overview, and check-in audits.
   - `Manager`: Squad management, blocker resolution, project lifecycle, and task assignment.
   - `TeamLead`: Sprint execution, squad coordination, and subtask reviews.
   - `Member`: Daily check-in logging, task execution, comment collaboration, and personal pulse tracking.
@@ -47,7 +47,7 @@ Traditional project management tools (like Jira, Asana, or Monday.com) often dev
 
 ---
 
-### 🎯 2. Strategic Goals & OKR Management
+### 🎯 2. Strategic Goals & Objectives Management
 - **Hierarchical Objectives**: Define company-wide, department-level, or squad-specific strategic objectives.
 - **Quantifiable Key Results**: Track measurable metrics with customizable units (`%`, `$`, `Users`, `Points`, `Count`), target values, and current progress.
 - **Task Linkage**: Directly associate specific operational tasks to Key Results. As tasks are completed, KR progress indicators and objective health reflect real momentum.
@@ -86,7 +86,7 @@ Traditional project management tools (like Jira, Asana, or Monday.com) often dev
 ---
 
 ### 💓 5. The Daily Pulse (Asynchronous Standup & Bottleneck Engine)
-- **Daily EOD Check-In Modal**: A 60-second end-of-day workflow for every team member:
+- **Daily Check-In Modal**: A 60-second end-of-day workflow for every team member:
   - Auto-imports completed tasks for the day as accomplishments.
   - Allows manual accomplishment logging.
   - Captures active blockers with an optional **"Flag to Manager"** emergency toggle.
@@ -118,7 +118,7 @@ Pulse features an interactive dual-mode relationship engine to visualize organiz
   └────────────────────┘            └─────────┬──────────┘
                                               │
                                     ┌─────────┴──────────┐
-                                    │    5. Goals/OKRs   │
+                                    │      5. Goals      │
                                     └────────────────────┘
 ```
 
@@ -132,7 +132,7 @@ Pulse features an interactive dual-mode relationship engine to visualize organiz
    - 5-Ring concentric force-directed interactive physics layout.
    - Zoom, pan, drag, and custom node pinning with local persistence.
    - **Focus Neighborhood Mode**: Select any node and filter graph depth to 1–4 hops to isolate dependencies without visual "hairballs".
-   - **Filter Overlays**: One-click toggles for `All Relationships`, `Blockers Only` (isolating at-risk paths), and `Goals & OKRs Only`.
+   - **Filter Overlays**: One-click toggles for `All Relationships`, `Blockers Only` (isolating at-risk paths), and `Goals Only`.
 
 3. **Interactive Stacked Folder Sidebar**:
    - Collapsible hierarchical tree view with cascading badges.
@@ -181,7 +181,7 @@ Follow this step-by-step blueprint to roll out Pulse across your business:
 
 ```mermaid
 flowchart TD
-    A[1. Setup Organization & Squads] --> B[2. Define Strategic Goals & OKRs]
+    A[1. Setup Organization & Squads] --> B[2. Define Strategic Goals & Key Results]
     B --> C[3. Create Projects with Workflow Templates]
     C --> D[4. Break Down Projects into Tasks & Subtasks]
     D --> E[5. Run Daily Execution & Async Pulse Check-Ins]
@@ -201,13 +201,13 @@ flowchart TD
    - Assign a **Team Lead** to each squad.
 3. **Invite Team Members & Set Roles**:
    - Share the workspace invite link (`https://pulse-epicordia.web.app/acme-corp/join`).
-   - As team members register, approve them in the **Waiting Room** and assign their RBAC role and squad.
+   - As team members register, approve them in the **Waiting Room** and assign their role permissions and squad.
 4. **Establish Enterprise Tags**:
    - Go to **Admin Settings > Governed Tags** and set up standard taxonomies (e.g. `Q3-Priority`, `Customer-Escalated`, `Backend`, `Mobile`).
 
 ---
 
-### Step 2: Establish Strategic Goals & Key Results (OKRs)
+### Step 2: Establish Strategic Goals & Key Results
 1. Navigate to the **Goals** screen.
 2. Click **"+ New Goal"** to define top-level strategic objectives (e.g., *"Expand Enterprise ARR by 40%"* or *"Achieve 99.99% Platform Reliability"*).
 3. Add 2–4 quantifiable **Key Results** per goal with clear target metrics and deadlines.
@@ -218,7 +218,7 @@ flowchart TD
 1. Go to the **Projects** screen and click **"+ New Project"**.
 2. Select the optimal **Workflow Template** (e.g., `SoftwareSprint` for development, `MarketingCampaign` for product launches).
 3. Link the project to its primary squad (or multiple squads if cross-functional).
-4. Connect the project to its parent **Goal / OKR**.
+4. Connect the project to its parent **Strategic Goal**.
 
 ---
 
@@ -264,8 +264,8 @@ flowchart TD
 ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────────┐
 │ Persona                 │ Primary Daily / Weekly Workflow                                            │
 ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
-│ 👑 Executives & C-Suite │ • Review high-level KPIs on Dashboard.                                     │
-│                         │ • Monitor company-wide OKR progress in Goals screen.                       │
+│ 👑 Executives & C-Suite │ • Review high-level key metrics on Dashboard.                              │
+│                         │ • Monitor company-wide goal progress in Goals screen.                      │
 │                         │ • Inspect Spider Web graph for cross-department bottlenecks.               │
 ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
 │ 🛠️ Managers & Leads    │ • Review Daily Pulse check-ins every morning.                              │
@@ -276,8 +276,8 @@ flowchart TD
 │    & Designers          │ • Check off subtasks and update task statuses.                             │
 │                         │ • Submit 60-second Daily Pulse at end-of-day.                              │
 ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
-│ 👥 HR & Operations      │ • Manage member onboarding approvals in Waiting Room.                      │
-│                         │ • Monitor squad capacity hours to balance workloads.                       │
+│ 👥 Human Resources &    │ • Manage member onboarding approvals in Waiting Room.                      │
+│    Operations           │ • Monitor squad capacity hours to balance workloads.                       │
 │                         │ • Maintain governed tag taxonomies in Admin Settings.                      │
 └─────────────────────────┴────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -300,4 +300,4 @@ Pulse is designed for high velocity with extensive keyboard shortcut support:
 
 ## 8. Summary
 
-Pulse is the modern operating system for outcome-driven organizations. By replacing noisy meetings with high-fidelity async signals, aligning every task to strategic OKRs, and visualizing dependencies in real time, Pulse gives leadership total visibility and empowers teams to execute with uncompromised velocity.
+Pulse is the modern operating system for outcome-driven organizations. By replacing noisy meetings with high-fidelity async signals, aligning every task to strategic goals, and visualizing dependencies in real time, Pulse gives leadership total visibility and empowers teams to execute with uncompromised velocity.

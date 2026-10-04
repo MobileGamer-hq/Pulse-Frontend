@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { 
   X, Plus, Network, 
-  ArrowRight, Loader2, Clock, Calendar, Check
+  ArrowRight, Loader2, Clock, Calendar, Check, Lock
 } from 'lucide-react';
 import { getProjectContributors } from '../../utils/projectContributors';
 
@@ -28,10 +28,20 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
   };
 
   const project = projects.find(p => p.id === id || p.name.toLowerCase() === id.toLowerCase()) || projects[0];
+  const canViewTask = (t: any) => {
+    if (!t.isPrivate) return true;
+    const isPrivileged = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
+    const isAssigned = Boolean(currentUser?.id && t.assigneeIds && t.assigneeIds.includes(currentUser.id));
+    const isCreator = Boolean(currentUser?.id && t.createdBy && t.createdBy === currentUser.id);
+    return isPrivileged || isAssigned || isCreator;
+  };
+
   const projectTasks = tasks.filter(t => 
-    (project && t.projectId === project.id) ||
-    (t.projectId === id) ||
-    (project && t.projectName && project.name && t.projectName.toLowerCase() === project.name.toLowerCase())
+    canViewTask(t) && (
+      (project && t.projectId === project.id) ||
+      (t.projectId === id) ||
+      (project && t.projectName && project.name && t.projectName.toLowerCase() === project.name.toLowerCase())
+    )
   );
   const completedTasksCount = projectTasks.filter(t => t.status === 'Done').length;
   const progressPercent = projectTasks.length > 0 
@@ -321,12 +331,15 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ id }) =>
                           {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                         </div>
                         <div>
-                          <div className={`text-xs font-mono ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 font-medium'}`}>
-                            {t.title}
+                          <div className={`text-xs font-mono flex items-center gap-1.5 ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 font-medium'}`}>
+                            <span>{t.title}</span>
+                            {t.isPrivate && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.2 rounded border border-amber-200 dark:border-amber-800">
+                                <Lock className="w-2.5 h-2.5" /> Private
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] font-mono text-neutral-400 flex items-center gap-2 mt-0.5">
-                            <span>{t.id.substring(0, 8).toUpperCase()}</span>
-                            <span>•</span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-neutral-400" />
                               {t.dueDate || 'No due date'}

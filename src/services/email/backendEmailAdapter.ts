@@ -8,9 +8,11 @@ import { emailConfig } from './config';
  */
 export class BackendEmailAdapter implements EmailService {
   private apiUrl: string;
+  private backupApiUrl?: string;
 
-  constructor(options?: { apiUrl?: string }) {
+  constructor(options?: { apiUrl?: string; backupApiUrl?: string }) {
     this.apiUrl = (options?.apiUrl || emailConfig.backend.apiUrl).replace(/\/+$/, '');
+    this.backupApiUrl = (options?.backupApiUrl || emailConfig.backend.backupApiUrl)?.replace(/\/+$/, '');
   }
 
   private getHeaders(): HeadersInit {
@@ -19,6 +21,65 @@ export class BackendEmailAdapter implements EmailService {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
+  }
+
+  /**
+   * Dispatches a POST request with automatic failover to the backup API if primary fails.
+   */
+  private async postWithFailover(
+    endpoint: string,
+    payload: Record<string, any>,
+    label: string
+  ): Promise<{ data: any; usedUrl: string }> {
+    const urlsToTry = [this.apiUrl];
+    if (this.backupApiUrl && this.backupApiUrl !== this.apiUrl) {
+      urlsToTry.push(this.backupApiUrl);
+    }
+
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < urlsToTry.length; i++) {
+      const baseUrl = urlsToTry[i];
+      const isBackup = i > 0;
+      const targetUrl = `${baseUrl}${endpoint}`;
+
+      try {
+        console.log(
+          `[BackendEmailAdapter] ${isBackup ? '[BACKUP FAILOVER]' : '[PRIMARY]'} Sending ${label} to "${payload.recipientEmail || payload.toEmail}" via ${targetUrl}...`
+        );
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          throw new Error(errorText || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json().catch(() => ({}));
+        console.log(
+          `[BackendEmailAdapter] ${isBackup ? '[BACKUP]' : '[PRIMARY]'} ${label.toUpperCase()} SENT SUCCESSFULLY to "${payload.recipientEmail || payload.toEmail}"!`,
+          data
+        );
+
+        return { data, usedUrl: baseUrl };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(
+          `[BackendEmailAdapter] ${isBackup ? 'Backup' : 'Primary'} server (${targetUrl}) failed for ${label}:`,
+          err.message || err
+        );
+
+        if (!isBackup && urlsToTry.length > 1) {
+          console.warn(`[BackendEmailAdapter] Automatically failing over to backup endpoint: ${urlsToTry[1]}${endpoint}...`);
+        }
+      }
+    }
+
+    throw lastError || new Error(`Failed to send ${label} on both primary and backup servers.`);
   }
 
   /**
@@ -37,25 +98,11 @@ export class BackendEmailAdapter implements EmailService {
     };
 
     try {
-      console.info(`[BackendEmailAdapter] Sending welcome email to ${params.toEmail} via ${this.apiUrl}/api/email/welcome`);
-      const response = await fetch(`${this.apiUrl}/api/email/welcome`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(errorText || `Backend returned HTTP ${response.status}`);
-      }
-
-      const data = await response.json().catch(() => ({}));
-      console.info('[BackendEmailAdapter] Welcome email sent successfully:', data);
-
+      const { data, usedUrl } = await this.postWithFailover('/api/email/welcome', payload, 'welcome email');
       return {
         success: true,
         messageId: data.messageId || data.id || 'welcome-sent',
-        provider: 'backend',
+        provider: usedUrl === this.backupApiUrl ? 'backend-backup' : 'backend',
       };
     } catch (error: any) {
       console.error('[BackendEmailAdapter] Failed to send welcome email:', error);
@@ -85,31 +132,16 @@ export class BackendEmailAdapter implements EmailService {
     };
 
     try {
-      console.log(`[BackendEmailAdapter] 🚀 Preparing to send invite email to "${params.toEmail}" via ${this.apiUrl}/api/email/invite...`);
-      console.log('[BackendEmailAdapter] 📦 Invite payload:', JSON.stringify(payload, null, 2));
-
-      const response = await fetch(`${this.apiUrl}/api/email/invite`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        console.error(`[BackendEmailAdapter] ❌ Backend rejected invite email (HTTP ${response.status}):`, errorText);
-        throw new Error(errorText || `Backend returned HTTP ${response.status}`);
-      }
-
-      const data = await response.json().catch(() => ({}));
-      console.log(`[BackendEmailAdapter] ✅ INVITATION EMAIL SENT SUCCESSFULLY to "${params.toEmail}"! Server response:`, data);
+      console.log('[BackendEmailAdapter] Invite payload:', JSON.stringify(payload, null, 2));
+      const { data, usedUrl } = await this.postWithFailover('/api/email/invite', payload, 'invite email');
 
       return {
         success: true,
         messageId: data.messageId || data.id || 'invite-sent',
-        provider: 'backend',
+        provider: usedUrl === this.backupApiUrl ? 'backend-backup' : 'backend',
       };
     } catch (error: any) {
-      console.error(`[BackendEmailAdapter] ❌ Failed to dispatch invitation email to "${params.toEmail}":`, error);
+      console.error(`[BackendEmailAdapter] Failed to dispatch invitation email to "${params.toEmail}":`, error);
       return {
         success: false,
         error: error.message || 'Failed to dispatch invite email via backend',
@@ -123,22 +155,11 @@ export class BackendEmailAdapter implements EmailService {
    */
   async sendEmail(params: SendEmailParams): Promise<EmailSendResult> {
     try {
-      const response = await fetch(`${this.apiUrl}/api/email/send`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(params),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(errorText || `Backend returned HTTP ${response.status}`);
-      }
-
-      const data = await response.json().catch(() => ({}));
+      const { data, usedUrl } = await this.postWithFailover('/api/email/send', params, 'email');
       return {
         success: true,
         messageId: data.messageId || data.id,
-        provider: 'backend',
+        provider: usedUrl === this.backupApiUrl ? 'backend-backup' : 'backend',
       };
     } catch (error: any) {
       console.error('[BackendEmailAdapter] Failed to send email:', error);

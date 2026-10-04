@@ -16,7 +16,7 @@ type CalendarViewMode = 'month' | 'week' | 'day';
 
 export const ScheduleScreen: React.FC = () => {
   const { 
-    currentOrgSlug, currentUser, users, tasks, projects, 
+    currentOrgSlug, currentUser, activeRole, users, tasks, projects, 
     pushPanel, refreshWorkspaceData, isFocusMode, setIsFocusMode, addTask 
   } = useApp();
 
@@ -72,7 +72,15 @@ export const ScheduleScreen: React.FC = () => {
   // Convert real database tasks into calendar items
   const taskCalendarItems = useMemo<CalendarItem[]>(() => {
     return tasks
-      .filter(t => Boolean(t.dueDate || t.startDate))
+      .filter(t => {
+        if (t.isPrivate) {
+          const isPrivileged = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
+          const isAssigned = Boolean(currentUser?.id && t.assigneeIds && t.assigneeIds.includes(currentUser.id));
+          const isCreator = Boolean(currentUser?.id && t.createdBy && t.createdBy === currentUser.id);
+          if (!isPrivileged && !isAssigned && !isCreator) return false;
+        }
+        return Boolean(t.dueDate || t.startDate);
+      })
       .map(t => {
         let dangerLevel: DangerImportanceLevel = 'medium';
         if (t.status === 'Blocked' || t.status === 'AtRisk' || t.priority === 'Urgent') {

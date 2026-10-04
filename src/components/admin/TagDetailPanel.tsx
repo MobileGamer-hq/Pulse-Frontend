@@ -28,7 +28,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
     colorHex: '#3B82F6',
     bgHex: 'rgba(59, 130, 246, 0.1)',
     textHex: '#3B82F6',
-    description: 'Tag classification for tracking across tasks, projects, and OKR goals.' 
+    description: 'Tag classification for tracking across tasks, projects, and strategic goals.' 
   };
 
   const taggedTasks = tasks.filter(t => (t.tagIds || []).includes(tag.id) || (t.tagIds || []).includes(tag.name));
@@ -75,7 +75,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
         </div>
 
         <p className="text-xs text-neutral-500 leading-relaxed font-sans max-w-2xl">
-          {tag.description || `Tag classification for tracking across tasks, projects, and OKR goals.`}
+          {tag.description || `Tag classification for tracking across tasks, projects, and strategic goals.`}
         </p>
       </div>
 
@@ -170,7 +170,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
 
         <div className="p-4 rounded-xl bg-neutral-50/50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 space-y-1">
           <div className="flex justify-between items-center text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
-            <span>Linked OKRs</span>
+            <span>Linked Goals</span>
             <Target className="w-3.5 h-3.5" />
           </div>
           <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{taggedGoals.length}</div>
@@ -261,7 +261,7 @@ export const TagDetailPanel: React.FC<TagDetailPanelProps> = ({ id }) => {
                       <span className="w-2 h-2 rounded-full bg-black dark:bg-white shrink-0" />
                       <span>{g.title}</span>
                     </div>
-                    <p className="text-[11px] text-neutral-500 pl-4">{g.description || 'OKR Target'}</p>
+                    <p className="text-[11px] text-neutral-500 pl-4">{g.description || 'Strategic Target'}</p>
                   </div>
                 ))}
               </div>

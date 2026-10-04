@@ -360,7 +360,7 @@ export const InviteAcceptanceScreen: React.FC<InviteAcceptanceScreenProps> = ({ 
                       required
                       value={inviteToken}
                       onChange={e => { setInviteToken(e.target.value); setError(null); }}
-                      placeholder="Enter invite code (e.g. INV-9821)"
+                      placeholder="Enter invite code (e.g. INVITE-9821)"
                       className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>

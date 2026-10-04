@@ -93,7 +93,7 @@ export function calculateAnalytics(
     else if (lower.includes('require') || lower.includes('spec') || lower.includes('design')) category = 'Unclear Requirements';
     else if (lower.includes('credential') || lower.includes('stripe') || lower.includes('key') || lower.includes('api')) category = 'API / Credentials';
     else if (lower.includes('depend') || lower.includes('wait') || lower.includes('block')) category = 'Dependencies & Approvals';
-    else if (lower.includes('deploy') || lower.includes('ci') || lower.includes('build')) category = 'CI/CD Pipeline Friction';
+    else if (lower.includes('deploy') || lower.includes('ci') || lower.includes('build')) category = 'Deployment Pipeline Friction';
 
     blockerCountMap[category] = (blockerCountMap[category] || 0) + 1;
   });

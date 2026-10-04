@@ -5,17 +5,18 @@ import {
   Plus, ShieldAlert, Clock, CheckCircle2, FolderPlus, Target, 
   Frown, Meh, Smile, Activity, ArrowUpRight, ChevronRight, 
   MoreVertical, Check, ExternalLink, GitGraph, 
-  FolderGit2, Trash2, Calendar, RotateCw
+  FolderGit2, Trash2, Calendar, RotateCw, Lock
 } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
-import type { TaskStatus, Priority } from '../../types';
+import type { Task, TaskStatus, Priority } from '../../types';
 
 export const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const { 
     tasks, projects, goals, users, eodEntries, 
     submitEOD, deleteEOD, setActiveScreen, currentOrgSlug, pushPanel,
-    updateTask, deleteTask, refreshWorkspaceData
+    updateTask, deleteTask, refreshWorkspaceData,
+    currentUser, activeRole
   } = useApp();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -43,9 +44,18 @@ export const DashboardScreen: React.FC = () => {
   const todayDate = new Date();
   const dateFormatted = todayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  const canViewTask = (t: Task) => {
+    if (!t.isPrivate) return true;
+    const isPrivileged = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
+    const isAssigned = Boolean(currentUser?.id && t.assigneeIds && t.assigneeIds.includes(currentUser.id));
+    const isCreator = Boolean(currentUser?.id && t.createdBy && t.createdBy === currentUser.id);
+    return isPrivileged || isAssigned || isCreator;
+  };
+
+  const visibleTasks = tasks.filter(canViewTask);
   const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'Planning');
-  const blockedTasks = tasks.filter(t => t.status === 'Blocked');
-  const completedTasks = tasks.filter(t => t.status === 'Done');
+  const blockedTasks = visibleTasks.filter(t => t.status === 'Blocked');
+  const completedTasks = visibleTasks.filter(t => t.status === 'Done');
 
   const handleLogReflection = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +88,7 @@ export const DashboardScreen: React.FC = () => {
     setTimeout(() => setCheckinSuccess(false), 3000);
   };
 
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = visibleTasks.filter(t => {
     if (activeTaskFilter === 'All') return true;
     return t.status === activeTaskFilter;
   });
@@ -390,6 +400,11 @@ export const DashboardScreen: React.FC = () => {
                               {task.title}
                             </span>
                             {getPriorityBadge(task.priority)}
+                            {task.isPrivate && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800" title="Private Task">
+                                <Lock className="w-2.5 h-2.5" /> Private
+                              </span>
+                            )}
                           </div>
                           
                           {/* Sub-meta: Linked Project & Due Date */}
@@ -955,7 +970,7 @@ export const DashboardScreen: React.FC = () => {
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' 
                               : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                           }`}>
-                            {entry.energyIndex >= 4 ? '⚡ High' : entry.energyIndex === 3 ? '⚡ Steady' : '⚡ Low'} ({entry.energyIndex}/5)
+                            {entry.energyIndex >= 4 ? 'High' : entry.energyIndex === 3 ? 'Steady' : 'Low'} ({entry.energyIndex}/5)
                           </span>
                           <span className="text-neutral-400 text-[10px]">{entry.date}</span>
                           <button
@@ -983,7 +998,7 @@ export const DashboardScreen: React.FC = () => {
                           <ul className="space-y-0.5 text-neutral-700 dark:text-neutral-300 font-sans text-xs">
                             {entry.accomplishments.map((acc, aIdx) => (
                               <li key={aIdx} className="flex items-start gap-1.5">
-                                <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                                 <span className="line-clamp-2">{acc}</span>
                               </li>
                             ))}
@@ -1043,7 +1058,8 @@ export const DashboardScreen: React.FC = () => {
                         </div>
                       ) : (
                         <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 pt-0.5">
-                          <span>✓ No blockers reported</span>
+                          <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span>No blockers reported</span>
                         </div>
                       )}
                     </div>

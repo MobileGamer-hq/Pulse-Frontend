@@ -229,7 +229,7 @@ export const OnboardingWizardScreen: React.FC<OnboardingWizardScreenProps> = ({ 
     {
       id: 'MarketingCampaign',
       title: 'Sales & Pipeline',
-      desc: 'Structured for lead progression, CRM integration, and forecasting.',
+      desc: 'Structured for lead progression, customer relationship management integration, and forecasting.',
       icon: TrendingUp
     },
     {

@@ -85,6 +85,8 @@ export interface Task {
   blockedReason?: string;
   subtasks: { id: string; title: string; done: boolean; assigneeId?: string }[];
   comments: { id: string; authorId: string; authorName: string; text: string; createdAt: string; updatedAt?: string }[];
+  isPrivate?: boolean;
+  createdBy?: string;
   createdAt: string;
   updatedAt: string;
 }

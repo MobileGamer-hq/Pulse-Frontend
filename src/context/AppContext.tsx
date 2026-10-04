@@ -1113,16 +1113,32 @@ const markAllNotificationsAsRead = async () => {
   };
 
   const updateSubtask = async (taskId: string, subtaskId: string, updates: Partial<{ title: string; done: boolean; assigneeId?: string }>) => {
+    let shouldMarkTaskDone = false;
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
+      const nextSubtasks = (t.subtasks || []).map(st => st.id === subtaskId ? { ...st, ...updates } : st);
+      const allDone = nextSubtasks.length > 0 && nextSubtasks.every(st => st.done);
+      if (allDone && t.status !== 'Done') {
+        shouldMarkTaskDone = true;
+        return {
+          ...t,
+          status: 'Done',
+          subtasks: nextSubtasks,
+          updatedAt: new Date().toISOString()
+        };
+      }
       return {
         ...t,
-        subtasks: (t.subtasks || []).map(st => st.id === subtaskId ? { ...st, ...updates } : st)
+        subtasks: nextSubtasks,
+        updatedAt: new Date().toISOString()
       };
     }));
     try {
       if (currentOrgSlug) {
         await taskService.updateSubtask(currentOrgSlug, taskId, subtaskId, updates);
+        if (shouldMarkTaskDone) {
+          await taskService.updateTask(currentOrgSlug, taskId, { status: 'done' });
+        }
       }
     } catch (err) {
       console.warn('[updateSubtask error]:', err);
@@ -1145,22 +1161,38 @@ const markAllNotificationsAsRead = async () => {
 
   const toggleSubtask = async (taskId: string, subtaskId: string) => {
     let nextDone = true;
+    let shouldMarkTaskDone = false;
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
+      const nextSubtasks = (t.subtasks || []).map(st => {
+        if (st.id === subtaskId) {
+          nextDone = !st.done;
+          return { ...st, done: nextDone };
+        }
+        return st;
+      });
+      const allDone = nextSubtasks.length > 0 && nextSubtasks.every(st => st.done);
+      if (allDone && t.status !== 'Done') {
+        shouldMarkTaskDone = true;
+        return {
+          ...t,
+          status: 'Done',
+          subtasks: nextSubtasks,
+          updatedAt: new Date().toISOString()
+        };
+      }
       return {
         ...t,
-        subtasks: (t.subtasks || []).map(st => {
-          if (st.id === subtaskId) {
-            nextDone = !st.done;
-            return { ...st, done: nextDone };
-          }
-          return st;
-        })
+        subtasks: nextSubtasks,
+        updatedAt: new Date().toISOString()
       };
     }));
     try {
       if (currentOrgSlug) {
         await taskService.updateSubtask(currentOrgSlug, taskId, subtaskId, { done: nextDone });
+        if (shouldMarkTaskDone) {
+          await taskService.updateTask(currentOrgSlug, taskId, { status: 'done' });
+        }
       }
     } catch (err) {
       console.warn('[toggleSubtask error]:', err);

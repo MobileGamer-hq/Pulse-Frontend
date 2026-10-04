@@ -1,5 +1,6 @@
 import { supabase, getCurrentUserEmail, getCurrentUserName, getOrgIdBySlug, getOrgBySlug, ensureUserExists } from './supabaseClient';
 import { emailService } from './emailService';
+import type { Role } from '../types';
 
 export interface CreateOrgPayload {
   name: string;
@@ -21,6 +22,18 @@ export const normalizeUserRole = (role?: string): ValidUserRole => {
   if (clean === 'team_lead' || clean === 'teamlead' || clean === 'lead') return 'team_lead';
   if (clean === 'contractor') return 'contractor';
   return 'member';
+};
+
+export const denormalizeUserRole = (role?: string): Role => {
+  if (!role) return 'Member';
+  const clean = role.toLowerCase().replace(/[\s-_]+/g, '').trim();
+  if (clean === 'admin' || clean === 'administrator') return 'Admin';
+  if (clean === 'executive' || clean === 'exec') return 'Executive';
+  if (clean === 'hr' || clean === 'humanresources') return 'HR';
+  if (clean === 'manager') return 'Manager';
+  if (clean === 'teamlead' || clean === 'lead') return 'TeamLead';
+  if (clean === 'contractor') return 'Contractor';
+  return 'Member';
 };
 
 const RESERVED_SLUGS = ['welcome', 'login', 'signin', 'register', 'signup', 'select-org', 'create-org', 'join-org', 'invite', 'admin', 'api', 'dashboard', 'settings'];
@@ -194,16 +207,30 @@ export const organizationService = {
         .eq('status', 'approved');
 
       if (!error && data && data.length > 0) {
-        const members = data.map((m: any) => ({
-          id: m.user?.id || m.user_id,
-          orgId: cleanSlug,
-          name: m.user?.full_name || m.user?.email?.split('@')[0] || 'Team Member',
-          email: m.user?.email || '',
-          role: m.role ? (m.role.charAt(0).toUpperCase() + m.role.slice(1)) : 'Member',
-          avatarUrl: m.user?.avatar_url,
-          capacityHoursPerWeek: m.user?.capacity_hours_per_week || 40,
-          joinedAt: m.joined_at,
-        }));
+        // Load any stored metadata overrides (job title & role)
+        let storedMeta: Record<string, { title?: string; role?: Role }> = {};
+        try {
+          storedMeta = JSON.parse(localStorage.getItem(`pulse_member_metadata_${cleanSlug}`) || '{}');
+        } catch (e) {}
+
+        const members = data.map((m: any) => {
+          const userId = m.user?.id || m.user_id;
+          const userMeta = storedMeta[userId] || {};
+          const role = userMeta.role || denormalizeUserRole(m.role || m.user?.role);
+          const title = userMeta.title || (role === 'Admin' ? 'Workspace Admin' : `${role} Specialist`);
+
+          return {
+            id: userId,
+            orgId: cleanSlug,
+            name: m.user?.full_name || m.user?.email?.split('@')[0] || 'Team Member',
+            email: m.user?.email || '',
+            role,
+            title,
+            avatarUrl: m.user?.avatar_url,
+            capacityHoursPerWeek: m.user?.capacity_hours_per_week || 40,
+            joinedAt: m.joined_at,
+          };
+        });
         return { members };
       }
     } catch (e) {
@@ -276,6 +303,45 @@ export const organizationService = {
     return { success: true };
   },
 
+  updateMemberRoleAndTitle: async (orgSlug: string, userId: string, payload: { role?: string; title?: string }) => {
+    const cleanSlug = (orgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase().trim();
+
+    // 1. Immediately persist to localStorage metadata dictionary
+    try {
+      const metaKey = `pulse_member_metadata_${cleanSlug}`;
+      const existingMeta: Record<string, { title?: string; role?: Role }> = JSON.parse(localStorage.getItem(metaKey) || '{}');
+      existingMeta[userId] = {
+        ...existingMeta[userId],
+        ...(payload.title !== undefined ? { title: payload.title.trim() } : {}),
+        ...(payload.role ? { role: denormalizeUserRole(payload.role) } : {}),
+      };
+      localStorage.setItem(metaKey, JSON.stringify(existingMeta));
+    } catch (metaErr) {
+      console.warn('[updateMemberRoleAndTitle] Failed to save member metadata in localStorage:', metaErr);
+    }
+
+    // 2. Sync to Supabase organization_memberships (and users table if supported)
+    try {
+      const orgId = await getOrgIdBySlug(cleanSlug);
+      if (orgId && payload.role) {
+        const formattedRole = normalizeUserRole(payload.role);
+        const { error: memError } = await supabase
+          .from('organization_memberships')
+          .update({ role: formattedRole })
+          .eq('org_id', orgId)
+          .eq('user_id', userId);
+
+        if (memError) {
+          console.warn('[updateMemberRoleAndTitle] organization_memberships error:', memError);
+        }
+      }
+    } catch (err) {
+      console.warn('[updateMemberRoleAndTitle] organization_memberships exception:', err);
+    }
+
+    return { success: true };
+  },
+
   createInvite: async (orgSlug: string, payload: { email: string; role?: string; teamId?: string }) => {
     const cleanSlug = (orgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase().trim();
     const org = await getOrgBySlug(cleanSlug);
@@ -307,12 +373,12 @@ export const organizationService = {
     }
 
     const inviteLink = `${window.location.origin}/invite/${token}`;
-    console.log(`[organizationService.createInvite] 💾 Invite saved to Supabase successfully (token: ${token}). Now triggering email dispatch...`);
+    console.log(`[organizationService.createInvite] Invite saved to Supabase successfully (token: ${token}). Now triggering email dispatch...`);
 
     // Dispatch workspace invitation email asynchronously via modular email service
     // Template variables: {{from_name}}, {{org_name}}, {{token}}
     const inviterName = getCurrentUserName() || 'A workspace member';
-    console.log(`[organizationService.createInvite] ✉️ Dispatching invite email to: "${payload.email}" from "${inviterName}" for org "${org.name}"`);
+    console.log(`[organizationService.createInvite] Dispatching invite email to: "${payload.email}" from "${inviterName}" for org "${org.name}"`);
 
     emailService.sendInviteEmail({
       toEmail: payload.email.trim().toLowerCase(),
@@ -323,12 +389,12 @@ export const organizationService = {
       role: payload.role || 'Member',
     }).then((res) => {
       if (res.success) {
-        console.log(`[organizationService.createInvite] ✅ Invitation email sent successfully to "${payload.email}"!`, res);
+        console.log(`[organizationService.createInvite] Invitation email sent successfully to "${payload.email}"!`, res);
       } else {
-        console.error(`[organizationService.createInvite] ❌ Invitation email FAILED to send to "${payload.email}":`, res.error);
+        console.error(`[organizationService.createInvite] Invitation email FAILED to send to "${payload.email}":`, res.error);
       }
     }).catch((emailErr) => {
-      console.error('[organizationService.createInvite] ❌ Invitation email unexpected exception:', emailErr);
+      console.error('[organizationService.createInvite] Invitation email unexpected exception:', emailErr);
     });
 
     return {

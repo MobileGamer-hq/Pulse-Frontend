@@ -123,7 +123,7 @@ export const JoinOrgScreen: React.FC = () => {
                 type="text"
                 value={inviteToken}
                 onChange={e => { setInviteToken(e.target.value); setError(null); }}
-                placeholder="e.g. INV-98241 or UUID token"
+                placeholder="e.g. INVITE-98241 or access token"
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white font-mono text-xs"
               />
             </div>
@@ -160,7 +160,7 @@ export const JoinOrgScreen: React.FC = () => {
             onClick={() => navigate('/create-org')}
             className="font-bold text-black dark:text-white hover:underline cursor-pointer"
           >
-            Create New Org →
+            Create New Organization →
           </button>
         </div>
       </div>

@@ -1081,10 +1081,10 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                 ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs font-semibold'
                 : 'text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
             }`}
-            title="Spotlight OKR Alignments"
+            title="Spotlight Goal Alignments"
           >
             <Target className="w-3 h-3" />
-            <span>OKRs</span>
+            <span>Goals</span>
           </button>
         </div>
 
@@ -1515,7 +1515,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                     <text textAnchor="middle" dy="-3" fill={isDarkMode ? '#FFFFFF' : '#1E1B4B'} fontSize="10.5" fontWeight="bold" fontFamily="monospace">
                       {node.label.length > 8 ? node.label.substring(0, 8).toUpperCase() : node.label.toUpperCase()}
                     </text>
-                    <text textAnchor="middle" dy="10" fill={isDarkMode ? '#A5B4FC' : '#4F46E5'} fontSize="8" fontWeight="bold" fontFamily="monospace">ORG CORE</text>
+                    <text textAnchor="middle" dy="10" fill={isDarkMode ? '#A5B4FC' : '#4F46E5'} fontSize="7.5" fontWeight="bold" fontFamily="monospace">ORGANIZATION</text>
                     <text textAnchor="middle" dy={node.radius + 20} fill={isDarkMode ? '#E0E7FF' : '#1E1B4B'} fontSize="11" fontWeight="bold">{node.label}</text>
                   </g>
                 )}
@@ -1600,7 +1600,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                       strokeWidth="1" 
                       opacity={0.6} 
                     />
-                    <text textAnchor="middle" dy="-3" fill={isDarkMode ? '#22D3EE' : '#0E7490'} fontSize="9" fontWeight="bold" fontFamily="monospace">PRJ</text>
+                    <text textAnchor="middle" dy="-3" fill={isDarkMode ? '#22D3EE' : '#0E7490'} fontSize="7.5" fontWeight="bold" fontFamily="monospace">PROJECT</text>
                     <text textAnchor="middle" dy="9" fill={isDarkMode ? '#A5F3FC' : '#0891B2'} fontSize="7" fontWeight="semibold" fontFamily="monospace">
                       {node.status && node.status.length > 8 ? `${node.status.substring(0, 7)}.` : (node.status || 'Active')}
                     </text>
@@ -1769,7 +1769,7 @@ export const SpiderWebCanvas: React.FC<SpiderWebCanvasProps> = ({
                       strokeWidth="1" 
                       opacity={0.6} 
                     />
-                    <text textAnchor="middle" dy="3.5" fill={isDarkMode ? '#F0ABFC' : '#86198F'} fontSize="8.5" fontWeight="bold" fontFamily="monospace">OKR</text>
+                    <text textAnchor="middle" dy="3.5" fill={isDarkMode ? '#F0ABFC' : '#86198F'} fontSize="8" fontWeight="bold" fontFamily="monospace">GOAL</text>
                     <text textAnchor="middle" dy={node.radius + 20} fill={isDarkMode ? '#F4F5F7' : '#581C87'} fontSize="10.5" fontWeight="bold">
                       {node.label.length > 20 ? `${node.label.substring(0, 18)}...` : node.label}
                     </text>

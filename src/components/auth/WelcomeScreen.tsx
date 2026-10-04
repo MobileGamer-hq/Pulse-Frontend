@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, Shield, Activity, Layers, 
-  LogIn
+  LogIn, Zap
 } from 'lucide-react';
 import { PulseLogo } from '../common/PulseLogo';
 
@@ -245,7 +245,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             <div className="w-full max-w-md bg-white dark:bg-neutral-950 p-6 sm:p-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-6">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
-                  <span>⚡ Instant Deployment</span>
+                  <Zap className="w-3 h-3 text-emerald-500" />
+                  <span>Instant Deployment</span>
                 </div>
                 <h3 className="font-bold text-lg text-neutral-900 dark:text-white tracking-tight">
                   Get Started with Pulse

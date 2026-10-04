@@ -49,22 +49,22 @@ const ROLE_DETAILS: RolePrivilegeInfo[] = [
     role: 'Executive',
     title: 'Executive Leadership (C-Suite / VP)',
     badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300',
-    description: 'Strategic oversight role focused on high-level enterprise goals, portfolio reporting, and risk mitigation.',
-    scopeDescription: 'Strategic executive oversight, enterprise goals, and portfolio health metrics',
+    description: 'Executive leadership role with full strategic oversight, project/task execution capabilities, and portfolio management.',
+    scopeDescription: 'Strategic executive leadership, portfolio goals, task execution, and team oversight',
     permissions: {
       createProjects: true,
-      createTasks: false,
+      createTasks: true,
       createGoals: true,
-      createTags: false,
-      manageUsers: false,
+      createTags: true,
+      manageUsers: true,
       viewReports: true,
       systemSettings: false,
     },
     keyResponsibilities: [
       'Set and monitor company-wide strategic Goals and Key Results',
+      'Create and direct projects, execution tasks, and operational initiatives',
       'Generate monthly & weekly executive operational briefs',
-      'Monitor cross-team velocity and strategic blocker escalations',
-      'View company-wide workload metrics without changing lower-level tasks'
+      'Oversee resource allocation, team capacity, and cross-functional delivery'
     ]
   },
   {
@@ -270,7 +270,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-neutral-400" /> Create Tasks</td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
@@ -290,7 +290,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-neutral-400" /> Create System Tags</td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
@@ -300,7 +300,7 @@ export const RolePrivilegesModal: React.FC<RolePrivilegesModalProps> = ({ isOpen
                     <tr>
                       <td className="p-2.5 font-semibold flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-neutral-400" /> Manage Team Members</td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
-                      <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>
+                      <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-emerald-600"><Check className="w-4 h-4 mx-auto stroke-[2.5]" /></td>
                       <td className="p-2.5 text-center text-neutral-300 dark:text-neutral-700"><Minus className="w-4 h-4 mx-auto" /></td>

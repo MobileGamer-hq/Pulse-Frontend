@@ -7,16 +7,16 @@ import {
   List, LayoutGrid, GitCommit, Users, Filter, X, 
   ChevronDown, ChevronRight, CheckCircle2, Plus,
   MessageSquare, Calendar, AlertTriangle, GripVertical,
-  Check, ArrowUp, RotateCw, Sliders
+  Check, ArrowUp, RotateCw, Sliders, Lock
 } from 'lucide-react';
-import type { TaskStatus } from '../../types';
+import type { Task, TaskStatus } from '../../types';
 
 type ViewMode = 'list' | 'kanban' | 'timeline' | 'workload';
 
 export const TasksScreen: React.FC = () => {
   const { 
     tasks, projects, users, tags, pushPanel, reorderTasks, refreshWorkspaceData,
-    workloadSettings, currentUser, activeRole 
+    workloadSettings, currentUser, activeRole, updateTask
   } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,7 +106,16 @@ export const TasksScreen: React.FC = () => {
     setHighPriorityOnly(false);
   };
 
+  const canViewTask = (t: Task) => {
+    if (!t.isPrivate) return true;
+    const isPrivileged = ['Admin', 'Executive', 'Manager'].includes(activeRole || currentUser?.role || '');
+    const isAssigned = Boolean(currentUser?.id && t.assigneeIds && t.assigneeIds.includes(currentUser.id));
+    const isCreator = Boolean(currentUser?.id && t.createdBy && t.createdBy === currentUser.id);
+    return isPrivileged || isAssigned || isCreator;
+  };
+
   const filteredTasks = tasks.filter(t => {
+    if (!canViewTask(t)) return false;
     if (selectedStatus !== 'All' && t.status !== selectedStatus) return false;
     if (selectedAssignee !== 'All' && !t.assigneeIds.includes(selectedAssignee)) return false;
     if (selectedTag !== 'All' && !t.tagIds.includes(selectedTag)) return false;
@@ -353,17 +362,17 @@ export const TasksScreen: React.FC = () => {
       ) : viewMode === 'list' ? (
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+            <table className="w-full text-left text-xs font-mono min-w-[960px]">
               <thead className="bg-neutral-50 dark:bg-neutral-800/60 text-neutral-400 border-b border-neutral-200 dark:border-neutral-800 uppercase text-[10px]">
                 <tr>
                   <th className="py-3 px-2 w-8 text-center" aria-label="Drag handle"></th>
-                  <th className="py-3 px-4 w-12">Pri</th>
-                  <th className="py-3 px-4">Title</th>
-                  <th className="py-3 px-4">Project</th>
-                  <th className="py-3 px-4">Assignee</th>
-                  <th className="py-3 px-4">Due Date</th>
-                  <th className="py-3 px-4">Tags</th>
-                  <th className="py-3 px-4 text-right">Status</th>
+                  <th className="py-3 px-4 w-16 whitespace-nowrap">Pri</th>
+                  <th className="py-3 px-4 min-w-[220px]">Title</th>
+                  <th className="py-3 px-4 w-44 whitespace-nowrap">Project</th>
+                  <th className="py-3 px-4 w-40 whitespace-nowrap">Assignee</th>
+                  <th className="py-3 px-4 w-36 whitespace-nowrap">Due Date</th>
+                  <th className="py-3 px-4 w-36 whitespace-nowrap">Tags</th>
+                  <th className="py-3 px-4 w-32 text-right whitespace-nowrap">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -375,7 +384,7 @@ export const TasksScreen: React.FC = () => {
 
                   return (
                     <tr 
-                      key={t.id}
+                      key={t.id} 
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', t.id);
@@ -403,7 +412,7 @@ export const TasksScreen: React.FC = () => {
                       </td>
 
                       {/* Priority Icon Carets matching Image 1 */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         {t.priority === 'Urgent' ? (
                           <span className="text-red-600 font-bold text-sm">⇡</span>
                         ) : t.priority === 'High' ? (
@@ -415,57 +424,84 @@ export const TasksScreen: React.FC = () => {
 
                       {/* Title & Code */}
                       <td className="py-3.5 px-4">
-                        <div className={`font-bold text-neutral-900 dark:text-neutral-100 ${isDone ? 'line-through opacity-50' : ''}`}>
-                          {t.title}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-mono mt-0.5">
-                          <span>{t.id.substring(0, 8).toUpperCase()}</span>
-                          {t.subtasks && t.subtasks.length > 0 && (
-                            <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-semibold bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
-                              <Check className="w-3 h-3 text-emerald-500" />
-                              <span>{t.subtasks.filter(s => s.done).length}/{t.subtasks.length}</span>
-                            </span>
-                          )}
-                          {t.comments && t.comments.length > 0 && (
-                            <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-semibold bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
-                              <MessageSquare className="w-3 h-3 text-neutral-400" /> {t.comments.length}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`font-bold text-neutral-900 dark:text-neutral-100 ${isDone ? 'line-through opacity-50' : ''}`}>
+                            {t.title}
+                          </span>
+                          {t.isPrivate && (
+                            <span 
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded whitespace-nowrap"
+                              title="Private Task - Only visible to assignees, managers, executives, and admins"
+                            >
+                              <Lock className="w-2.5 h-2.5" />
+                              Private
                             </span>
                           )}
                         </div>
+                        {((t.subtasks && t.subtasks.length > 0) || (t.comments && t.comments.length > 0)) && (
+                          <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-mono mt-0.5">
+                            {t.subtasks && t.subtasks.length > 0 && (
+                              <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-semibold bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                <Check className="w-3 h-3 text-emerald-500" />
+                                <span>{t.subtasks.filter(s => s.done).length}/{t.subtasks.length}</span>
+                              </span>
+                            )}
+                            {t.comments && t.comments.length > 0 && (
+                              <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-semibold bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                <MessageSquare className="w-3 h-3 text-neutral-400" /> {t.comments.length}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Project Column */}
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 font-sans">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span 
+                          className="inline-flex items-center max-w-[190px] truncate px-2.5 py-1 rounded-lg text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 font-sans whitespace-nowrap"
+                          title={projects.find(p => p.id === t.projectId)?.name || t.projectName || 'General Project'}
+                        >
                           {projects.find(p => p.id === t.projectId)?.name || t.projectName || 'General Project'}
                         </span>
                       </td>
 
                       {/* Assignee */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         {assignee ? (
                           <div className="flex items-center gap-2">
                             <UserAvatar name={assignee.name} avatarUrl={assignee.avatarUrl} size="xs" />
-                            <span className="text-neutral-700 dark:text-neutral-300 font-medium">{assignee.name}</span>
+                            <span className="text-neutral-700 dark:text-neutral-300 font-medium truncate max-w-[130px]" title={assignee.name}>{assignee.name}</span>
                           </div>
                         ) : (
                           <span className="text-neutral-400 font-mono text-[11px]">Unassigned</span>
                         )}
                       </td>
 
-                      {/* Due Date */}
-                      <td className="py-3.5 px-4 text-neutral-500 font-medium">
-                        {t.dueDate || 'Oct 12'}
+                      {/* Due Date - Interactive inline editing */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="date"
+                          value={t.dueDate ? (t.dueDate.includes('T') ? t.dueDate.split('T')[0] : t.dueDate) : ''}
+                          onChange={async (e) => {
+                            try {
+                              await updateTask(t.id, { dueDate: e.target.value });
+                            } catch (err) {
+                              console.warn(err);
+                            }
+                          }}
+                          className="bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:bg-white dark:focus:bg-neutral-800 px-2 py-1 rounded text-xs font-mono border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700 focus:border-neutral-400 dark:focus:border-neutral-500 text-neutral-700 dark:text-neutral-300 cursor-pointer focus:cursor-text transition-colors"
+                          title="Click to edit due date"
+                        />
                       </td>
 
                       {/* Tags Swatches */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-nowrap">
                           {t.tagIds.map(tid => {
                             const tg = tags.find(x => x.id === tid);
                             if (!tg) return null;
                             return (
-                              <span key={tg.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1" style={{ backgroundColor: tg.bgHex, color: tg.textHex, borderColor: 'transparent' }}>
+                              <span key={tg.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1 shrink-0" style={{ backgroundColor: tg.bgHex, color: tg.textHex, borderColor: 'transparent' }}>
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tg.colorHex }} />
                                 {tg.name}
                               </span>
@@ -475,8 +511,8 @@ export const TasksScreen: React.FC = () => {
                       </td>
 
                       {/* Status Pill */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold border ${
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <span className={`inline-flex items-center justify-center gap-1 px-3 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
                           t.status === 'Done' 
                             ? 'bg-neutral-100 text-neutral-700 border-neutral-300' 
                             : t.status === 'InProgress' 
@@ -540,11 +576,18 @@ export const TasksScreen: React.FC = () => {
                   }`}
                 >
                   <div className="flex justify-between items-center text-[10px] font-mono">
-                    <div className="flex items-center gap-1.5">
-                      <GripVertical className="w-3 h-3 text-neutral-400" />
-                      <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">Backend</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GripVertical className="w-3 h-3 text-neutral-400 shrink-0" />
+                      <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 truncate max-w-[120px] whitespace-nowrap" title={t.projectName || 'Task'}>
+                        {t.projectName || 'Task'}
+                      </span>
+                      {t.isPrivate && (
+                        <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-bold shrink-0" title="Private Task">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
                     </div>
-                    <ArrowUp className="w-3 h-3 text-neutral-400" />
+                    <ArrowUp className="w-3 h-3 text-neutral-400 shrink-0" />
                   </div>
                   <h4 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">{t.title}</h4>
                   <p className="text-[11px] text-neutral-500 line-clamp-2">{t.description}</p>
@@ -611,12 +654,19 @@ export const TasksScreen: React.FC = () => {
                   }`}
                 >
                   <div className="flex justify-between items-center text-[10px] font-mono">
-                    <div className="flex items-center gap-1.5">
-                      <GripVertical className="w-3 h-3 text-neutral-400" />
-                      <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">Design</span>
-                      {t.priority === 'Urgent' && <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 font-bold">Critical</span>}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GripVertical className="w-3 h-3 text-neutral-400 shrink-0" />
+                      <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 truncate max-w-[120px] whitespace-nowrap" title={t.projectName || 'Task'}>
+                        {t.projectName || 'Task'}
+                      </span>
+                      {t.isPrivate && (
+                        <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-bold shrink-0" title="Private Task">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
+                      {t.priority === 'Urgent' && <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 font-bold shrink-0">Critical</span>}
                     </div>
-                    <ArrowUp className="w-3 h-3 text-red-600 font-bold" />
+                    <ArrowUp className="w-3 h-3 text-red-600 font-bold shrink-0" />
                   </div>
                   <h4 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">{t.title}</h4>
                   <p className="text-[11px] text-neutral-500 line-clamp-2">{t.description}</p>
@@ -683,11 +733,19 @@ export const TasksScreen: React.FC = () => {
                   }`}
                 >
                   <div className="flex justify-between items-center text-[10px] font-mono">
-                    <div className="flex items-center gap-1.5">
-                      <GripVertical className="w-3 h-3 text-neutral-400" />
-                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Done</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GripVertical className="w-3 h-3 text-neutral-400 shrink-0" />
+                      <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 truncate max-w-[120px] whitespace-nowrap" title={t.projectName || 'Task'}>
+                        {t.projectName || 'Task'}
+                      </span>
+                      {t.isPrivate && (
+                        <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-bold shrink-0" title="Private Task">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0">Done</span>
                     </div>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   </div>
                   <h4 className="font-bold text-xs text-neutral-900 dark:text-neutral-100 leading-snug line-through opacity-70">{t.title}</h4>
                   <p className="text-[11px] text-neutral-500 line-clamp-2">{t.description}</p>

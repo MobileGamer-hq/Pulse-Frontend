@@ -51,7 +51,7 @@ export const GoalDetailPanel: React.FC<GoalDetailPanelProps> = ({ id }) => {
       <div>
         <div className="flex items-center justify-between">
           <span className="px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 uppercase tracking-wider font-mono">
-            {goal.ownerType} OKR Goal
+            {goal.ownerType} Goal
           </span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-mono">
             {goal.status}

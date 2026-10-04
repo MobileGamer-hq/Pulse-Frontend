@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, CheckCircle2, Lock, FileText, Briefcase, Target, Tag as TagIcon, UserPlus, Users, AlertTriangle, ArrowRight, Loader2, Check, ExternalLink, Info } from 'lucide-react';
+import { X, Plus, CheckCircle2, Lock, Globe, FileText, Briefcase, Target, Tag as TagIcon, UserPlus, Users, AlertTriangle, ArrowRight, Loader2, Check, ExternalLink, Info } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { organizationService } from '../../services/organizationService';
 import type { Role, Priority, TaskStatus, WorkflowTemplate } from '../../types';
@@ -110,6 +110,8 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
       setIsSubmitting(false);
       setTaskTitle('');
       setTaskDescription('');
+      setTaskDueDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+      setTaskIsPrivate(false);
       setTaskSubtasks([]);
       setNewModalSubtaskTitle('');
       setNewModalSubtaskAssigneeId('');
@@ -168,10 +170,11 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
           assigneeIds: [taskAssigneeId || currentUser.id],
           estimatedHours: taskEstimatedHours || 4,
           actualHours: 0,
-          dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+          dueDate: taskDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
           startDate: new Date().toISOString().split('T')[0],
           tagIds: [],
           dependencyTaskIds: [],
+          isPrivate: taskIsPrivate,
           subtasks: taskSubtasks.map((st, idx) => ({
             id: `sub-${Date.now()}-${idx}`,
             title: st.title,
@@ -253,13 +256,13 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         
         // 1. Call Organization Service to generate invitation token & link
         const targetSlug = currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia';
-        console.log('[CreateItemModal] 🚀 Inviting new member:', { memberName, memberEmail, memberRole, targetSlug });
+        console.log('[CreateItemModal] Inviting new member:', { memberName, memberEmail, memberRole, targetSlug });
         const inviteRes = await organizationService.createInvite(targetSlug, {
           email: memberEmail.trim(),
           role: memberRole,
           teamId: targetTeamId,
         });
-        console.log('[CreateItemModal] 📬 createInvite response received:', inviteRes);
+        console.log('[CreateItemModal] createInvite response received:', inviteRes);
 
         addUser({
           orgId: targetSlug,
@@ -310,7 +313,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         onClose();
       }, 200);
     } catch (err: any) {
-      console.error('[CreateItemModal] ❌ Error in item creation modal:', err);
+      console.error('[CreateItemModal] Error in item creation modal:', err);
       setSubmitError(err.message || 'Failed to save. Please try again.');
       setIsSubmitting(false);
     }
@@ -324,6 +327,8 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [taskPriority, setTaskPriority] = useState<Priority>('Medium');
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('Todo');
   const [taskEstimatedHours, setTaskEstimatedHours] = useState<number>(8);
+  const [taskDueDate, setTaskDueDate] = useState<string>(() => new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+  const [taskIsPrivate, setTaskIsPrivate] = useState<boolean>(false);
   const [taskAssigneeId, setTaskAssigneeId] = useState<string>(currentUser.id);
   const [taskSubtasks, setTaskSubtasks] = useState<{ title: string; assigneeId?: string }[]>([]);
   const [newModalSubtaskTitle, setNewModalSubtaskTitle] = useState('');
@@ -421,11 +426,8 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const checkPermission = (type: ItemType): { allowed: boolean; reason: string } => {
     switch (type) {
       case 'task':
-        if (['Admin', 'Manager', 'TeamLead', 'Member'].includes(activeRole)) {
+        if (['Admin', 'Executive', 'Manager', 'TeamLead', 'Member'].includes(activeRole)) {
           return { allowed: true, reason: '' };
-        }
-        if (activeRole === 'Executive') {
-          return { allowed: false, reason: 'Executives have strategic read-only view of tasks and do not create sprint items directly.' };
         }
         if (activeRole === 'HR') {
           return { allowed: false, reason: 'Human Resources roles are scoped to people & team management rather than technical sprint tasks.' };
@@ -436,7 +438,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         if (['Admin', 'Executive', 'Manager'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" does not have privilege to create top-level projects. Switch to Manager or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" does not have privilege to create top-level projects. Switch to Manager, Executive, or Admin.` };
 
       case 'goal':
         if (['Admin', 'Executive', 'Manager'].includes(activeRole)) {
@@ -445,22 +447,22 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         return { allowed: false, reason: `The role "${activeRole}" cannot define strategic goals. Switch to Executive, Manager, or Admin.` };
 
       case 'tag':
-        if (['Admin', 'Manager', 'TeamLead'].includes(activeRole)) {
+        if (['Admin', 'Executive', 'Manager', 'TeamLead'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot create global organization tags. Switch to Team Lead, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot create global organization tags. Switch to Team Lead, Manager, Executive, or Admin.` };
 
       case 'member':
-        if (['Admin', 'Manager', 'HR'].includes(activeRole)) {
+        if (['Admin', 'Executive', 'Manager', 'HR'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot invite or provision user accounts. Switch to Human Resources, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot invite or provision user accounts. Switch to Human Resources, Manager, Executive, or Admin.` };
 
       case 'team':
-        if (['Admin', 'Manager', 'HR'].includes(activeRole)) {
+        if (['Admin', 'Executive', 'Manager', 'HR'].includes(activeRole)) {
           return { allowed: true, reason: '' };
         }
-        return { allowed: false, reason: `The role "${activeRole}" cannot create new organizational teams. Switch to Human Resources, Manager, or Admin.` };
+        return { allowed: false, reason: `The role "${activeRole}" cannot create new organizational teams. Switch to Human Resources, Manager, Executive, or Admin.` };
 
       default:
         return { allowed: true, reason: '' };
@@ -822,7 +824,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Priority</label>
                         <select
@@ -851,6 +853,16 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                       </div>
 
                       <div>
+                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Due Date</label>
+                        <input
+                          type="date"
+                          value={taskDueDate}
+                          onChange={e => setTaskDueDate(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div>
                         <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">Est. Hours</label>
                         <input
                           type="number"
@@ -872,6 +884,34 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                         placeholder="Provide details and acceptance criteria..."
                         className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none resize-none font-sans"
                       />
+                    </div>
+
+                    {/* Task Privacy Setting */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-1.5 rounded-lg ${taskIsPrivate ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800'}`}>
+                          {taskIsPrivate ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                            {taskIsPrivate ? 'Private Task' : 'Public Task'}
+                          </div>
+                          <div className="text-[11px] text-neutral-500">
+                            {taskIsPrivate 
+                              ? 'Visible only to assigned member(s), managers, executives, and admins.' 
+                              : 'Visible to all workspace members across the team.'}
+                          </div>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={taskIsPrivate}
+                          onChange={e => setTaskIsPrivate(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-neutral-600 peer-checked:bg-amber-600"></div>
+                      </label>
                     </div>
 
                     {/* Initial Subtasks breakdown section */}
@@ -1028,7 +1068,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                           className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs focus:outline-none"
                         >
                           <option value="org">Organization Strategic Goal</option>
-                          <option value="team">Team OKR</option>
+                          <option value="team">Team Goal</option>
                           <option value="individual">Individual Objective</option>
                         </select>
                       </div>

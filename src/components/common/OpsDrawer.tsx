@@ -42,6 +42,34 @@ interface OpsDrawerProps {
   onClose: () => void;
 }
 
+// Helper to reveal words smoothly without breaking characters mid-word
+const getNextSlice = (current: string, target: string, wordsCount: number = 1): string => {
+  if (current.length >= target.length) return target;
+  const remaining = target.slice(current.length);
+  let wordsSeen = 0;
+  let inWord = false;
+  let splitIndex = remaining.length;
+
+  for (let i = 0; i < remaining.length; i++) {
+    const isSpace = /\s/.test(remaining[i]);
+    if (!isSpace && !inWord) {
+      inWord = true;
+      wordsSeen++;
+    } else if (isSpace && inWord) {
+      inWord = false;
+      if (wordsSeen >= wordsCount) {
+        while (i + 1 < remaining.length && /\s/.test(remaining[i + 1])) {
+          i++;
+        }
+        splitIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  return current + remaining.slice(0, splitIndex);
+};
+
 export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   const appContext = useApp();
   const { currentUser, currentOrgSlug, tasks, pushPanel, updateTask } = appContext;
@@ -61,9 +89,60 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Typewriter animation queue
+  const typewriterTargetRef = useRef<{
+    msgId: string;
+    text: string;
+    done: boolean;
+    undoToken?: string;
+  } | null>(null);
+  const typewriterCurrentRef = useRef<string>('');
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
+
+  // Smooth Typewriter Loop: reveals text word-by-word at ~28ms cadence
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const target = typewriterTargetRef.current;
+      if (!target) return;
+
+      const current = typewriterCurrentRef.current;
+      if (current.length < target.text.length) {
+        const remainingLen = target.text.length - current.length;
+        // Paced typing: 1 word at a time for natural rhythm, catching up slightly if server sent a large paragraph
+        const wordsToTake = remainingLen > 300 ? 3 : remainingLen > 120 ? 2 : 1;
+        const nextText = getNextSlice(current, target.text, wordsToTake);
+        typewriterCurrentRef.current = nextText;
+
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === target.msgId
+              ? { ...m, text: nextText, isStreaming: true }
+              : m
+          )
+        );
+      } else if (target.done) {
+        // Stream completed and typewriter caught up
+        if (target.undoToken) {
+          setActiveUndoToken(target.undoToken);
+        }
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === target.msgId
+              ? { ...m, text: target.text, isStreaming: false, undoToken: target.undoToken }
+              : m
+          )
+        );
+        setIsStreaming(false);
+        typewriterTargetRef.current = null;
+        typewriterCurrentRef.current = '';
+      }
+    }, 28);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Global keyboard shortcut Cmd+J / Ctrl+J
   useEffect(() => {
@@ -127,6 +206,20 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
     const userMsgId = `user_${Date.now()}`;
     const opsMsgId = `ops_${Date.now()}`;
 
+    // Finalize any existing typewriter target before starting a new turn
+    if (typewriterTargetRef.current) {
+      const prevTarget = typewriterTargetRef.current;
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === prevTarget.msgId
+            ? { ...m, text: prevTarget.text, isStreaming: false }
+            : m
+        )
+      );
+      typewriterTargetRef.current = null;
+    }
+    typewriterCurrentRef.current = '';
+
     setMessages(prev => [
       ...prev,
       {
@@ -176,9 +269,11 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
       {
         onToken: (token: string) => {
           accumulatedText += token;
-          setMessages(prev =>
-            prev.map(m => (m.id === opsMsgId ? { ...m, text: accumulatedText } : m))
-          );
+          typewriterTargetRef.current = {
+            msgId: opsMsgId,
+            text: accumulatedText,
+            done: false,
+          };
         },
         onAction: (act: ActionCall) => {
           stagedActions.push(act);
@@ -239,6 +334,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
 
             // Turn 2: Grounded confirmation
             let secondLegText = '';
+            typewriterCurrentRef.current = '';
             await aiService.streamChatMessage(
               {
                 sessionId: meta.sessionId,
@@ -250,24 +346,22 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
               {
                 onToken: (token: string) => {
                   secondLegText += token;
-                  setMessages(prev =>
-                    prev.map(m => (m.id === opsMsgId ? { ...m, text: secondLegText } : m))
-                  );
+                  typewriterTargetRef.current = {
+                    msgId: opsMsgId,
+                    text: secondLegText,
+                    done: false,
+                  };
                 },
                 onDone: (secondMeta) => {
-                  if (secondMeta.undoToken) {
-                    setActiveUndoToken(secondMeta.undoToken);
-                  }
-                  setMessages(prev =>
-                    prev.map(m =>
-                      m.id === opsMsgId
-                        ? { ...m, isStreaming: false, undoToken: secondMeta.undoToken }
-                        : m
-                    )
-                  );
-                  setIsStreaming(false);
+                  typewriterTargetRef.current = {
+                    msgId: opsMsgId,
+                    text: secondLegText,
+                    done: true,
+                    undoToken: secondMeta.undoToken,
+                  };
                 },
                 onError: () => {
+                  typewriterTargetRef.current = null;
                   setMessages(prev =>
                     prev.map(m => (m.id === opsMsgId ? { ...m, isStreaming: false } : m))
                   );
@@ -278,20 +372,17 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
             return;
           }
 
-          if (meta.undoToken) {
-            setActiveUndoToken(meta.undoToken);
-          }
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === opsMsgId
-                ? { ...m, isStreaming: false, undoToken: meta.undoToken }
-                : m
-            )
-          );
-          setIsStreaming(false);
+          // Direct message without tools
+          typewriterTargetRef.current = {
+            msgId: opsMsgId,
+            text: accumulatedText,
+            done: true,
+            undoToken: meta.undoToken,
+          };
         },
         onError: (err) => {
           console.error('Stream error:', err);
+          typewriterTargetRef.current = null;
           setMessages(prev =>
             prev.map(m =>
               m.id === opsMsgId

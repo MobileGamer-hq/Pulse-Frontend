@@ -39,10 +39,7 @@ export interface ChatResponse {
 }
 
 const AGENT_API_URL =
-  import.meta.env.VITE_PULSE_AGENT_URL ||
-  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8001'
-    : 'https://pulse-agent-brown.vercel.app');
+  import.meta.env.VITE_PULSE_AGENT_URL || 'https://pulse-agent.epicordia.com';
 
 export const aiService = {
   checkHealth: async () => {

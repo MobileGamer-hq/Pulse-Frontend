@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Bot, X, Send, RotateCcw, Layers,
-  ChevronDown, ChevronRight, Check, Loader2
+  ChevronDown, ChevronRight, Check, Loader2, Sparkles
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { aiService, type DryRunDiff, type ActionCall } from '../../services/aiService';
 import { executeOpsTool, type ToolExecutionResult } from '../../services/opsToolExecutor';
 import { DiffPreviewModal } from './DiffPreviewModal';
+import { UserAvatar } from './UserAvatar';
 
 interface ActionStep {
   id: string;
@@ -698,75 +699,111 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         )}
 
         {/* Messages Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs font-sans">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
-            >
-              <div
-                className={`max-w-[90%] p-3.5 rounded-2xl ${
-                  m.sender === 'user'
-                    ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded-tr-xs'
-                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-tl-xs border border-neutral-200/60 dark:border-neutral-700/60'
-                }`}
-              >
-                {/* Collapsible Action Timeline */}
-                {m.actionSteps && m.actionSteps.length > 0 && (
-                  <CollapsibleActionTimeline
-                    steps={m.actionSteps}
-                    isWorking={m.isStreaming}
-                  />
-                )}
-
-                {/* Message Text with Streaming Cursor (▊) */}
-                <p className="leading-relaxed whitespace-pre-wrap">
-                  {m.text}
-                  {m.isStreaming && (
-                    <span className="inline-block animate-pulse font-mono text-neutral-400 dark:text-neutral-500 font-bold ml-0.5">
-                      ▊
-                    </span>
-                  )}
-                </p>
-
-                {/* Interactive Result Chips Under Message */}
-                {m.resultChips && m.resultChips.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-neutral-200/80 dark:border-neutral-700/80 space-y-2">
-                    {m.resultChips.map(chip => (
-                      <InteractiveResultChip
-                        key={chip.id}
-                        chip={chip}
-                        onToggleStatus={handleToggleTask}
-                        onOpenDetail={(id) => {
-                          pushPanel({ type: 'task', id });
-                          onClose();
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Dry Run Preview Trigger Card */}
-                {m.dryRunDiff && (
-                  <div className="mt-3 p-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-neutral-100">
-                      <Layers className="w-4 h-4 text-neutral-500" />
-                      <span>{m.dryRunDiff.summary}</span>
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs font-sans">
+          {messages.map((m) => {
+            if (m.sender === 'user') {
+              return (
+                <div key={m.id} className="flex items-start justify-end gap-2.5">
+                  <div className="flex flex-col items-end max-w-[80%]">
+                    <div className="px-4 py-2.5 rounded-2xl rounded-tr-xs bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-2xs">
+                      <p className="leading-relaxed whitespace-pre-wrap text-[13px]">
+                        {m.text}
+                      </p>
                     </div>
-                    <button
-                      onClick={() => setActiveDiff(m.dryRunDiff!)}
-                      className="w-full py-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-[11px] hover:bg-neutral-800 transition-colors"
-                    >
-                      Review Diff Preview ({m.dryRunDiff.affectedCount} items) →
-                    </button>
+                    <span className="text-[10px] font-mono text-neutral-400 mt-1 px-1">
+                      {m.timestamp}
+                    </span>
                   </div>
-                )}
+                  <div className="shrink-0 mt-0.5">
+                    <UserAvatar
+                      name={currentUser?.name || 'User'}
+                      avatarUrl={currentUser?.avatarUrl}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            // Ops Agent message (NO chat bubble, direct borderless text with AI profile avatar)
+            return (
+              <div key={m.id} className="flex items-start justify-start gap-3 w-full">
+                {/* AI Profile Avatar */}
+                <div className="w-7 h-7 rounded-full bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+
+                {/* Agent Content Body */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  {/* Collapsible Action Timeline */}
+                  {m.actionSteps && m.actionSteps.length > 0 && (
+                    <CollapsibleActionTimeline
+                      steps={m.actionSteps}
+                      isWorking={m.isStreaming}
+                    />
+                  )}
+
+                  {/* Thinking State when waiting for first token */}
+                  {m.isStreaming && !m.text.trim() && (!m.actionSteps || m.actionSteps.length === 0) ? (
+                    <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500 py-1">
+                      <span className="flex gap-1 items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 animate-bounce [animation-delay:-0.3s]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 animate-bounce [animation-delay:-0.15s]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 animate-bounce" />
+                      </span>
+                      <span className="italic font-mono text-[11px]">Ops is thinking...</span>
+                    </div>
+                  ) : m.text ? (
+                    <div className="text-[13px] leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap font-sans">
+                      {m.text}
+                      {m.isStreaming && (
+                        <span className="inline-block animate-pulse font-mono text-neutral-400 dark:text-neutral-500 font-bold ml-1">
+                          ▊
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {/* Interactive Result Chips Under Message */}
+                  {m.resultChips && m.resultChips.length > 0 && (
+                    <div className="pt-1 space-y-1.5">
+                      {m.resultChips.map(chip => (
+                        <InteractiveResultChip
+                          key={chip.id}
+                          chip={chip}
+                          onToggleStatus={handleToggleTask}
+                          onOpenDetail={(id) => {
+                            pushPanel({ type: 'task', id });
+                            onClose();
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Dry Run Preview Trigger Card */}
+                  {m.dryRunDiff && (
+                    <div className="mt-2 p-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 space-y-2">
+                      <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-neutral-100">
+                        <Layers className="w-4 h-4 text-neutral-500" />
+                        <span>{m.dryRunDiff.summary}</span>
+                      </div>
+                      <button
+                        onClick={() => setActiveDiff(m.dryRunDiff!)}
+                        className="w-full py-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-[11px] hover:bg-neutral-800 transition-colors"
+                      >
+                        Review Diff Preview ({m.dryRunDiff.affectedCount} items) →
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] font-mono text-neutral-400 pt-0.5">
+                    {m.timestamp}
+                  </div>
+                </div>
               </div>
-              <span className="text-[10px] font-mono text-neutral-400 mt-1 px-1">
-                {m.timestamp}
-              </span>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -856,30 +893,30 @@ const CollapsibleActionTimeline: React.FC<{
   if (!steps || steps.length === 0) return null;
 
   return (
-    <div className="mb-2.5 font-mono text-[11px]">
+    <div className="mb-2 font-mono text-[11px] bg-neutral-100/70 dark:bg-neutral-800/50 border border-neutral-200/80 dark:border-neutral-700/60 rounded-xl p-2.5">
       <button
         onClick={() => setIsExpanded(prev => !prev)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer select-none"
+        className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors cursor-pointer select-none w-full"
       >
-        <span>Actions ({steps.length})</span>
+        <span className="font-semibold">Actions ({steps.length})</span>
         <ChevronDown
           className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isExpanded && (
-        <div className="mt-1.5 pl-3 ml-2 border-l border-neutral-300 dark:border-neutral-700 space-y-2">
+        <div className="mt-2 pl-2.5 border-l border-neutral-200 dark:border-neutral-700 space-y-2">
           {steps.map((step, idx) => (
             <div key={step.id || idx} className="relative flex items-start gap-2">
-              <div className="mt-0.5 -ml-[17px] p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
+              <div className="mt-0.5 -ml-[15px] p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
                 {step.status === 'running' ? (
-                  <Loader2 className="w-2.5 h-2.5 animate-spin text-neutral-400" />
+                  <Loader2 className="w-2.5 h-2.5 animate-spin text-neutral-600 dark:text-neutral-300" />
                 ) : (
-                  <div className="w-2 h-2 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 )}
               </div>
               <div className="min-w-0 flex-1 flex items-baseline justify-between gap-2">
-                <span className="text-neutral-500 dark:text-neutral-400 truncate">
+                <span className="text-neutral-700 dark:text-neutral-300 truncate">
                   {step.label}
                 </span>
                 <span className="text-[10px] text-neutral-400 shrink-0">{step.time}</span>

@@ -34,6 +34,7 @@ import { SlideOverDrawer } from './components/common/SlideOverDrawer';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { SupportModal } from './components/common/SupportModal';
 import { InAppNotificationToast } from './components/common/InAppNotificationToast';
+import { OpsDrawer } from './components/common/OpsDrawer';
 import { supabase } from './services/supabaseClient';
 
 const OrgRouteSync: React.FC = () => {
@@ -77,7 +78,7 @@ const OrgRouteSync: React.FC = () => {
 };
 
 const MainLayout: React.FC = () => {
-  const { activeScreen, isDarkMode, isWorkspaceLoading } = useApp();
+  const { activeScreen, isDarkMode, isWorkspaceLoading, isOpsOpen, setIsOpsOpen } = useApp();
 
   const [isPrivilegesOpen, setIsPrivilegesOpen] = useState(false);
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false);
@@ -172,6 +173,12 @@ const MainLayout: React.FC = () => {
         isOpen={isCreateItemOpen}
         initialType={createItemType}
         onClose={() => setIsCreateItemOpen(false)}
+      />
+
+      {/* Ops AI Operational Manager Drawer */}
+      <OpsDrawer
+        isOpen={isOpsOpen}
+        onClose={() => setIsOpsOpen(false)}
       />
     </div>
   );

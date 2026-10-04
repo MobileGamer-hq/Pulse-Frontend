@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from './UserAvatar';
 import { PulseLogo } from './PulseLogo';
-import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Building2, CheckCircle2, AlertTriangle, Plus, ChevronsUpDown, ChevronRight, Check, Key } from 'lucide-react';
+import { Search, Bell, HelpCircle, Settings, ShieldAlert, Moon, Sun, Menu, Building2, CheckCircle2, AlertTriangle, Plus, ChevronsUpDown, ChevronRight, Check, Key, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { 
-    setIsSearchOpen, isDarkMode, setIsDarkMode, currentUser, 
+    setIsSearchOpen, isOpsOpen, setIsOpsOpen, isDarkMode, setIsDarkMode, currentUser, 
     currentOrgSlug, setCurrentOrgSlug, currentOrgName, userOrgs, eodEntries, tasks, pushPanel, setActiveScreen, setIsMobileMenuOpen,
     notifications
   } = useApp();
@@ -199,7 +199,24 @@ export const Header: React.FC = () => {
       </div>
 
       {/* Right Icons */}
-      <div className="flex items-center gap-1 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-2.5">
+        {/* Ops AI Trigger Button */}
+        <button
+          onClick={() => setIsOpsOpen(prev => !prev)}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+            isOpsOpen
+              ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 border-neutral-900 dark:border-neutral-100'
+              : 'border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-800/70 text-neutral-800 dark:text-neutral-200 hover:border-neutral-400'
+          }`}
+          title="Open Ops AI Operational Manager (Cmd+J)"
+        >
+          <Bot className="w-3.5 h-3.5 text-neutral-900 dark:text-neutral-100" />
+          <span className="hidden xs:inline">Ops</span>
+          <kbd className="hidden sm:inline px-1 py-0.2 rounded text-[9px] font-mono bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-500">
+            ⌘J
+          </kbd>
+        </button>
+
         {/* Dark Mode Toggle */}
         <button
           onClick={() => setIsDarkMode(prev => !prev)}

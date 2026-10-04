@@ -11,7 +11,7 @@ import { teamService } from '../services/teamService';
 import { goalService } from '../services/goalService';
 import { eodService } from '../services/eodService';
 import { reportService } from '../services/reportService';
-import { organizationService } from '../services/organizationService';
+import { organizationService, denormalizeUserRole } from '../services/organizationService';
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { tagService } from '../services/tagService';
@@ -54,6 +54,10 @@ interface AppContextType {
   // Search Modal
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean) => void;
+
+  // Ops AI Operational Manager Drawer
+  isOpsOpen: boolean;
+  setIsOpsOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 
   // Mobile & Sidebar Menu State
   isMobileMenuOpen: boolean;
@@ -105,7 +109,7 @@ interface AppContextType {
   addGoal: (goal: Omit<Goal, 'id'>) => void;
   updateGoal: (goalId: string, updates: Partial<Goal>) => void;
   addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (userId: string, updates: Partial<User>) => void;
+  updateUser: (userId: string, updates: Partial<User>) => Promise<void> | void;
   addTeam: (team: Omit<Team, 'id' | 'orgId'>, targetOrgSlug?: string) => Promise<Team | void>;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
   deleteTeam: (teamId: string) => Promise<void>;
@@ -185,20 +189,33 @@ const getInitialOrgs = (): Organization[] => {
   return [];
 };
 
-const getInitialUser = (): User => ({
-  id: localStorage.getItem('pulse_user_id') || '',
-  orgId: localStorage.getItem('pulse_tenant_slug') || '',
-  name: localStorage.getItem('pulse_user_name') || '',
-  email: localStorage.getItem('pulse_user_email') || '',
-  role: 'Member',
-  teamId: 'team-main',
-  teamName: 'Core Operations',
-  title: localStorage.getItem('pulse_user_title') || '',
-  avatarColor: localStorage.getItem('pulse_user_avatar_color') || undefined,
-  avatarUrl: localStorage.getItem('pulse_user_avatar_url') || undefined,
-  capacityHoursPerWeek: 40,
-  activeProjectIds: []
-});
+const getInitialActiveRole = (): Role => {
+  try {
+    const slug = (localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase();
+    const stored = localStorage.getItem(`pulse_user_role_${slug}`) || localStorage.getItem('pulse_user_role');
+    if (stored) return denormalizeUserRole(stored);
+  } catch (e) {}
+  return 'Admin';
+};
+
+const getInitialUser = (): User => {
+  const slug = (localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase();
+  const initialRole = localStorage.getItem(`pulse_user_role_${slug}`) || localStorage.getItem('pulse_user_role') || 'Admin';
+  return {
+    id: localStorage.getItem('pulse_user_id') || '',
+    orgId: slug,
+    name: localStorage.getItem('pulse_user_name') || '',
+    email: localStorage.getItem('pulse_user_email') || '',
+    role: denormalizeUserRole(initialRole),
+    teamId: 'team-main',
+    teamName: 'Core Operations',
+    title: localStorage.getItem('pulse_user_title') || '',
+    avatarColor: localStorage.getItem('pulse_user_avatar_color') || undefined,
+    avatarUrl: localStorage.getItem('pulse_user_avatar_url') || undefined,
+    capacityHoursPerWeek: 40,
+    activeProjectIds: []
+  };
+};
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -218,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [currentUser, setCurrentUser] = useState<User>(getInitialUser());
-  const [activeRole, setActiveRoleState] = useState<Role>('Admin');
+  const [activeRole, setActiveRoleState] = useState<Role>(getInitialActiveRole);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialDarkMode);
 
@@ -262,6 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeScreen, setActiveScreen] = useState<string>(getInitialActiveScreen);
   const [panelStack, setPanelStack] = useState<DrawerPanel[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isOpsOpen, setIsOpsOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
@@ -436,11 +454,13 @@ const markAllNotificationsAsRead = async () => {
 
       // Sync User & Fetch Me Profile + Org Memberships + Pending Invites from Backend
       if (meRes?.user) {
+        const storedTitle = localStorage.getItem('pulse_user_title');
         setCurrentUser(prev => ({
           ...prev,
           id: meRes.user.id,
           email: meRes.user.email,
           name: meRes.user.fullName || prev.name || meRes.user.email.split('@')[0],
+          title: prev.title || storedTitle || (activeRole === 'Admin' ? 'Workspace Admin' : `${activeRole || 'Member'} Specialist`),
         }));
         localStorage.setItem('pulse_user_id', meRes.user.id);
         localStorage.setItem('pulse_user_email', meRes.user.email);
@@ -471,7 +491,7 @@ const markAllNotificationsAsRead = async () => {
           id: m.organization?.id || m.org_id,
           name: m.organization?.name || 'Organization',
           slug: m.organization?.slug || '',
-          role: (m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : 'Member') as any,
+          role: denormalizeUserRole(m.role),
           status: (m.status || 'approved').toUpperCase(),
           membersCount: m.organization?._count?.memberships ?? (m.organization?.membershipsCount || 1),
           activeProjects: m.organization?._count?.projects ?? 0,
@@ -517,6 +537,13 @@ const markAllNotificationsAsRead = async () => {
       let fetchedUsers: User[] = [];
       const defaultTeam = (teamsRes?.teams && teamsRes.teams.length > 0) ? teamsRes.teams[0] : null;
 
+      // Load saved member metadata overrides (titles & roles) from localStorage
+      const targetSlug = (currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase();
+      let savedMemberMeta: Record<string, { title?: string; role?: Role }> = {};
+      try {
+        savedMemberMeta = JSON.parse(localStorage.getItem(`pulse_member_metadata_${targetSlug}`) || '{}');
+      } catch (e) {}
+
       if (membersRes?.members && Array.isArray(membersRes.members)) {
         fetchedUsers = membersRes.members.map((m: any) => {
           const matchedTeam = teamsRes?.teams?.find((t: any) => 
@@ -528,15 +555,19 @@ const markAllNotificationsAsRead = async () => {
             t.id === m.team_id
           ) || defaultTeam;
 
+          const meta = savedMemberMeta[m.id] || {};
+          const effectiveRole = meta.role || denormalizeUserRole(m.role);
+          const effectiveTitle = meta.title || m.title || (effectiveRole === 'Admin' ? 'Workspace Admin' : `${effectiveRole || 'Member'} Specialist`);
+
           return {
             id: m.id,
             orgId: m.orgId || currentOrgSlug,
             name: m.name || m.email.split('@')[0],
             email: m.email,
-            role: m.role || 'Member',
+            role: effectiveRole,
             teamId: m.teamId || m.team_id || (matchedTeam ? matchedTeam.id : 'team-main'),
             teamName: m.teamName || m.team_name || (matchedTeam ? matchedTeam.name : 'Core Operations'),
-            title: m.title || (m.role === 'Admin' ? 'Workspace Admin' : `${m.role || 'Member'} Specialist`),
+            title: effectiveTitle,
             avatarUrl: m.avatarUrl,
             capacityHoursPerWeek: m.capacityHoursPerWeek || 40,
             activeProjectIds: m.activeProjectIds || [],
@@ -544,7 +575,29 @@ const markAllNotificationsAsRead = async () => {
         });
       }
 
+      // If remote returned no members, hydrate from local client members cache
+      if (fetchedUsers.length === 0) {
+        try {
+          const cached = JSON.parse(localStorage.getItem(`pulse_client_members_${targetSlug}`) || '[]');
+          if (Array.isArray(cached) && cached.length > 0) {
+            fetchedUsers = cached.map((u: User) => {
+              const meta = savedMemberMeta[u.id] || {};
+              return {
+                ...u,
+                role: meta.role || u.role || 'Member',
+                title: meta.title || u.title || 'Team Member',
+              };
+            });
+          }
+        } catch (e) {}
+      }
+
       setUsers(fetchedUsers);
+      if (fetchedUsers.length > 0) {
+        try {
+          localStorage.setItem(`pulse_client_members_${targetSlug}`, JSON.stringify(fetchedUsers));
+        } catch (e) {}
+      }
 
 
       // Keep userOrgs member count in sync with fetched approved members
@@ -629,6 +682,8 @@ const markAllNotificationsAsRead = async () => {
               text: c.text,
               createdAt: c.createdAt || c.created_at,
             })) : [],
+            isPrivate: Boolean(t.is_private || t.isPrivate),
+            createdBy: t.created_by || t.createdBy,
             createdAt: t.createdAt || t.created_at,
             updatedAt: t.updatedAt || t.updated_at,
           };
@@ -886,9 +941,12 @@ const markAllNotificationsAsRead = async () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(prev => !prev);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setIsOpsOpen(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -934,6 +992,11 @@ const markAllNotificationsAsRead = async () => {
       assigneeIds: taskData.assigneeIds,
       estimatedHours: taskData.estimatedHours,
       dueDate: taskData.dueDate,
+      startDate: taskData.startDate,
+      linkedGoalId: taskData.linkedGoalId,
+      subtasks: taskData.subtasks,
+      tagIds: taskData.tagIds,
+      isPrivate: taskData.isPrivate ?? false,
     });
 
     if (res?.task?.id) {
@@ -961,6 +1024,8 @@ const markAllNotificationsAsRead = async () => {
         blockedReason: res.task.blockedReason || taskData.blockedReason || undefined,
         subtasks: taskData.subtasks || [],
         comments: [],
+        isPrivate: Boolean(res.task.isPrivate ?? taskData.isPrivate ?? false),
+        createdBy: res.task.createdBy || currentUser.id,
         createdAt: res.task.createdAt || new Date().toISOString(),
         updatedAt: res.task.updatedAt || new Date().toISOString(),
       };
@@ -1003,6 +1068,7 @@ const markAllNotificationsAsRead = async () => {
         assigneeIds: updates.assigneeIds,
         tagIds: updates.tagIds,
         projectId: updates.projectId,
+        isPrivate: updates.isPrivate,
       });
     } catch (err) {
       console.warn('[updateTask API error]:', err);
@@ -1461,6 +1527,16 @@ const markAllNotificationsAsRead = async () => {
         const filtered = stored.filter((m: any) => m.email?.toLowerCase() !== newUser.email.toLowerCase());
         filtered.push(newUser);
         localStorage.setItem(`pulse_client_members_${targetSlug}`, JSON.stringify(filtered));
+
+        if (newUser.title || newUser.role) {
+          const metaKey = `pulse_member_metadata_${targetSlug}`;
+          const existingMeta: Record<string, { title?: string; role?: Role }> = JSON.parse(localStorage.getItem(metaKey) || '{}');
+          existingMeta[newUser.id] = {
+            ...(newUser.title ? { title: newUser.title } : {}),
+            ...(newUser.role ? { role: newUser.role } : {})
+          };
+          localStorage.setItem(metaKey, JSON.stringify(existingMeta));
+        }
       } catch (e) {}
 
       setUserOrgs(prevOrgs => {
@@ -1476,10 +1552,57 @@ const markAllNotificationsAsRead = async () => {
     });
   };
 
-  const updateUser = (userId: string, updates: Partial<User>) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
-    if (currentUser.id === userId) {
+  const updateUser = async (userId: string, updates: Partial<User>) => {
+    const targetSlug = (currentOrgSlug || localStorage.getItem('pulse_tenant_slug') || 'epicordia').toLowerCase();
+
+    // 1. Immediately persist to localStorage metadata dictionary
+    try {
+      const metaKey = `pulse_member_metadata_${targetSlug}`;
+      const existingMeta: Record<string, { title?: string; role?: Role }> = JSON.parse(localStorage.getItem(metaKey) || '{}');
+      existingMeta[userId] = {
+        ...existingMeta[userId],
+        ...(updates.title !== undefined ? { title: updates.title.trim() } : {}),
+        ...(updates.role ? { role: updates.role } : {})
+      };
+      localStorage.setItem(metaKey, JSON.stringify(existingMeta));
+    } catch (e) {
+      console.warn('[updateUser] Failed to save metadata:', e);
+    }
+
+    // 2. Optimistically update React users state & client members cache
+    setUsers(prev => {
+      const nextUsers = prev.map(u => u.id === userId ? { ...u, ...updates } : u);
+      try {
+        localStorage.setItem(`pulse_client_members_${targetSlug}`, JSON.stringify(nextUsers));
+      } catch (e) {}
+      return nextUsers;
+    });
+
+    // 3. If updating current logged in user
+    const targetUser = users.find(u => u.id === userId);
+    const isSelf = currentUser.id === userId || (Boolean(currentUser.email) && Boolean(targetUser?.email) && currentUser.email.toLowerCase() === targetUser?.email.toLowerCase());
+    if (isSelf) {
       updateCurrentUser(updates);
+      if (updates.role) {
+        setActiveRole(updates.role);
+        localStorage.setItem('pulse_user_role', updates.role);
+        localStorage.setItem(`pulse_user_role_${targetSlug}`, updates.role);
+      }
+      if (updates.title !== undefined) {
+        localStorage.setItem('pulse_user_title', updates.title);
+      }
+    }
+
+    // 4. Remote persistence to backend
+    if (targetSlug && (updates.role || updates.title !== undefined)) {
+      try {
+        await organizationService.updateMemberRoleAndTitle(targetSlug, userId, {
+          role: updates.role,
+          title: updates.title
+        });
+      } catch (e) {
+        console.warn('[updateUser] Remote persistence warning:', e);
+      }
     }
   };
 
@@ -1649,7 +1772,7 @@ const markAllNotificationsAsRead = async () => {
       await organizationService.approveMember(currentOrgSlug, requesterUserId, grantedRole.toLowerCase());
       // 3. Mark notification as read and updated
       await markNotificationAsRead(notificationId);
-      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true, title: `✓ Approved (${grantedRole}): ${n.title}` } : n));
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true, title: `Approved (${grantedRole}): ${n.title}` } : n));
     } catch (e) {
       console.warn('[approveAccessRequest error]:', e);
     }
@@ -1786,6 +1909,8 @@ const markAllNotificationsAsRead = async () => {
 
         isSearchOpen,
         setIsSearchOpen,
+        isOpsOpen,
+        setIsOpsOpen,
         isMobileMenuOpen,
         setIsMobileMenuOpen,
         isSidebarCollapsed,

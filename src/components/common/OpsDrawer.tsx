@@ -662,7 +662,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                 <h2 className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 tracking-tight">
                   Vein
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700">
                   Pulse Circulatory Engine
                 </span>
               </div>
@@ -928,7 +928,7 @@ const CollapsibleActionTimeline: React.FC<{
                 {step.status === 'running' ? (
                   <Loader2 className="w-2.5 h-2.5 animate-spin text-neutral-600 dark:text-neutral-300" />
                 ) : (
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="w-2 h-2 rounded-full bg-neutral-400 dark:bg-neutral-500" />
                 )}
               </div>
               <div className="min-w-0 flex-1 flex items-baseline justify-between gap-2">
@@ -962,7 +962,7 @@ const InteractiveResultChip: React.FC<{
         }}
         className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
           isDone
-            ? 'bg-emerald-500 border-emerald-500 text-white'
+            ? 'bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900'
             : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-500'
         }`}
         title={isDone ? 'Mark as Todo' : 'Mark as Done'}

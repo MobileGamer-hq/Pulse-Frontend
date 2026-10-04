@@ -203,16 +203,16 @@ export const Header: React.FC = () => {
         {/* Vein AI Trigger Button */}
         <button
           onClick={() => setIsOpsOpen(prev => !prev)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+          className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
             isOpsOpen
-              ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-400/20'
-              : 'border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 hover:border-neutral-400 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-850'
+              ? 'bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-100 ring-2 ring-neutral-400/20'
+              : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/80 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-neutral-700'
           }`}
           title="Open Vein AI Operational Partner (Cmd+J)"
         >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white transition-transform group-hover:scale-105 shrink-0" />
           <span className="font-bold tracking-tight">Vein</span>
-          <kbd className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-500">
+          <kbd className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/90 dark:border-neutral-700/80 text-neutral-400 dark:text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200">
             ⌘J
           </kbd>
         </button>

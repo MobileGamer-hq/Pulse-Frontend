@@ -70,9 +70,65 @@ const getNextSlice = (current: string, target: string, wordsCount: number = 1): 
   return current + remaining.slice(0, splitIndex);
 };
 
+// Helper to format non-technical, human-readable labels for actions in the timeline
+const formatActionLabel = (act: ActionCall): string => {
+  const p = act.parameters || {};
+  switch (act.tool) {
+    case 'query_team_state':
+      return 'Checking team status and roster';
+    case 'analyze_dependencies':
+      return 'Analyzing task dependencies';
+    case 'audit_sprint':
+      return 'Auditing sprint progress';
+    case 'google_search':
+      return p.query ? `Searching Google for "${p.query}"` : 'Searching Google';
+    case 'create_task':
+      return p.title ? `Creating task "${p.title}"` : 'Creating new task';
+    case 'update_task': {
+      const target = p.title || p.task_id || '';
+      return target ? `Updating task "${target}"` : 'Updating task';
+    }
+    case 'resolve_blocker': {
+      const target = p.title || p.task_id || '';
+      return target ? `Clearing blocker on "${target}"` : 'Clearing blocker';
+    }
+    case 'reschedule_tasks':
+      return 'Adjusting project timeline';
+    case 'batch_update_tasks':
+      return 'Updating multiple tasks';
+    case 'reassign_workload':
+      return 'Rebalancing team workload';
+    case 'archive_stale_entities':
+      return 'Archiving stale items';
+    case 'delete_project':
+      return 'Archiving project';
+    case 'delete_goal':
+      return 'Archiving goal';
+    default:
+      return act.tool
+        .replace(/_/g, ' ')
+        .replace(/^(query|get|fetch) /i, 'Checking ')
+        .replace(/^(create|add) /i, 'Creating ')
+        .replace(/^(update|modify) /i, 'Updating ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+  }
+};
+
 export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   const appContext = useApp();
-  const { currentUser, currentOrgSlug, tasks, pushPanel, updateTask } = appContext;
+  const {
+    currentUser,
+    currentOrgSlug,
+    currentOrg,
+    users,
+    teams,
+    projects,
+    tasks,
+    goals,
+    eodEntries,
+    pushPanel,
+    updateTask,
+  } = appContext;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -86,6 +142,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   const [activeDiff, setActiveDiff] = useState<DryRunDiff | null>(null);
   const [activeUndoToken, setActiveUndoToken] = useState<string | null>(null);
   const [undoStatus, setUndoStatus] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => 'sess_' + Math.random().toString(36).substring(2, 10));
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +225,12 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
     for (let i = 0; i < actions.length; i++) {
       const act = actions[i];
       const res = results[i];
+
+      // Only task-mutating actions (create, update, resolve_blocker) should produce result chips
+      if (!['create_task', 'update_task', 'resolve_blocker'].includes(act.tool)) {
+        continue;
+      }
+
       if (res && res.status === 'success') {
         const title = res.data?.title || act.parameters?.title || '';
         const taskId = res.data?.taskId || act.parameters?.task_id || '';
@@ -176,18 +239,23 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
           t => (taskId && t.id === taskId) || (title && t.title.toLowerCase() === title.toLowerCase())
         );
 
-        const finalId = matchedTask?.id || taskId || `task_${Date.now()}`;
-        const finalTitle = matchedTask?.title || title || 'Task';
-        const normTitle = finalTitle.toLowerCase().trim();
+        const finalId = matchedTask?.id || taskId;
+        const finalTitle = matchedTask?.title || title;
 
+        // Skip invalid, empty, or generic fallback titles like "Task"
+        if (!finalTitle || !finalTitle.trim() || finalTitle.trim().toLowerCase() === 'task') {
+          continue;
+        }
+
+        const normTitle = finalTitle.toLowerCase().trim();
         if (finalId && seenIds.has(finalId)) continue;
-        if (normTitle && seenTitles.has(normTitle)) continue;
+        if (seenTitles.has(normTitle)) continue;
 
         if (finalId) seenIds.add(finalId);
-        if (normTitle) seenTitles.add(normTitle);
+        seenTitles.add(normTitle);
 
         chips.push({
-          id: finalId,
+          id: finalId || `task_${Date.now()}`,
           title: finalTitle,
           status: matchedTask?.status || 'Todo',
           dueDate: matchedTask?.dueDate || res.data?.dueDate || act.parameters?.due_date,
@@ -241,19 +309,163 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
     if (!customText) setInput('');
     setIsStreaming(true);
 
+    // Productivity metrics calculation across entire team
+    const completedTasksByMember: Record<string, number> = {};
+    const activeTasksByMember: Record<string, number> = {};
+    const hoursByMember: Record<string, number> = {};
+    (tasks || []).forEach(t => {
+      (t.assigneeIds || []).forEach(uid => {
+        if (t.status === 'Done') {
+          completedTasksByMember[uid] = (completedTasksByMember[uid] || 0) + 1;
+        } else {
+          activeTasksByMember[uid] = (activeTasksByMember[uid] || 0) + 1;
+        }
+        hoursByMember[uid] = (hoursByMember[uid] || 0) + (t.estimatedHours || 0);
+      });
+    });
+
+    const pulsesByMember: Record<string, number> = {};
+    (eodEntries || []).forEach(e => {
+      if (e.userId) {
+        pulsesByMember[e.userId] = (pulsesByMember[e.userId] || 0) + 1;
+      }
+    });
+
+    const memberProductivity = (users || []).map(u => ({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      capacityHours: u.capacityHoursPerWeek || 40,
+      activeHours: hoursByMember[u.id] || 0,
+      completedTasks: completedTasksByMember[u.id] || 0,
+      activeTasks: activeTasksByMember[u.id] || 0,
+      dailyPulsesSubmitted: pulsesByMember[u.id] || 0,
+    })).sort((a, b) => (b.completedTasks + b.dailyPulsesSubmitted) - (a.completedTasks + a.dailyPulsesSubmitted));
+
+    const topProductiveMember = memberProductivity[0]?.name || 'N/A';
+
+    // Time horizon groupings
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const endOfWeek = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0];
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const tasksToday = (tasks || []).filter(t => t.dueDate === todayStr);
+    const tasksThisWeek = (tasks || []).filter(t => t.dueDate && t.dueDate <= endOfWeek && t.dueDate >= todayStr);
+    const tasksThisMonth = (tasks || []).filter(t => t.dueDate && t.dueDate <= endOfMonth);
+    const myTasks = (tasks || []).filter(t => (t.assigneeIds || []).includes(currentUser.id));
+    const blockedTasks = (tasks || []).filter(t => t.status === 'Blocked' || !!t.blockedReason);
+
     const contextPayload = {
       orgSlug: currentOrgSlug,
+      orgName: currentOrg?.name || currentOrgSlug,
       userName: currentUser.name,
       userRole: currentUser.role,
-      activeBlockerCount: tasks.filter(t => t.status === 'Blocked').length,
-      activeTasks: tasks.slice(0, 10).map(t => ({
+      todayDate: todayStr,
+      
+      // Complete Team Roster & Productivity Leaderboard
+      teamRoster: (users || []).map(u => ({
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        capacityHours: u.capacityHoursPerWeek || 40,
+      })),
+      teams: (teams || []).map(tm => ({
+        id: tm.id,
+        name: tm.name,
+        memberNames: (users || []).filter(u => tm.memberIds?.includes(u.id)).map(u => u.name),
+      })),
+      productivityRanking: memberProductivity,
+      topProductiveMember,
+
+      // Strategic Goals & Key Results
+      goals: (goals || []).map(g => {
+        const prog = g.keyResults?.length
+          ? Math.round(
+              g.keyResults.reduce(
+                (acc, kr) => acc + (kr.targetValue ? (kr.currentValue / kr.targetValue) * 100 : 0),
+                0
+              ) / g.keyResults.length
+            )
+          : 0;
+        return {
+          id: g.id,
+          title: g.title,
+          status: g.status,
+          progress: prog,
+          keyResults: (g.keyResults || []).map(
+            kr => `${kr.title} (${kr.currentValue}/${kr.targetValue} ${kr.unit || ''})`
+          ),
+        };
+      }),
+
+      // Projects
+      projects: (projects || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        targetDate: p.targetEndDate || p.startDate,
+      })),
+
+      // Recent Daily Pulses
+      recentDailyPulses: (eodEntries || []).slice(0, 15).map(e => ({
+        userName: e.userName,
+        mood: e.energyIndex >= 4 ? 'High Energy' : e.energyIndex <= 2 ? 'Low Energy' : 'Good Energy',
+        whatWentWell: (e.accomplishments || []).join('; '),
+        blockers: e.blockers,
+      })),
+
+      // Task Summary Analytics
+      taskSummary: {
+        total: (tasks || []).length,
+        todo: (tasks || []).filter(t => t.status === 'Todo').length,
+        inProgress: (tasks || []).filter(t => t.status === 'InProgress').length,
+        blocked: blockedTasks.length,
+        done: (tasks || []).filter(t => t.status === 'Done').length,
+        dueTodayCount: tasksToday.length,
+        dueThisWeekCount: tasksThisWeek.length,
+        dueThisMonthCount: tasksThisMonth.length,
+        myTasksCount: myTasks.length,
+      },
+
+      // Active Blockers with details
+      activeBlockers: blockedTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        assignee: (users || []).find(u => (t.assigneeIds || []).includes(u.id))?.name || 'Unassigned',
+        reason: t.blockedReason || 'Flagged as blocked',
+      })),
+
+      // Current User Tasks with subtasks
+      myTasks: myTasks.slice(0, 15).map(t => ({
         id: t.id,
         title: t.title,
         status: t.status,
         dueDate: t.dueDate,
-        estimatedHours: t.estimatedHours,
+        priority: t.priority,
+        subtasks: (t.subtasks || []).map(s => `${s.title} [${s.done ? 'Done' : 'Pending'}]`),
+      })),
+
+      // Active Tasks in Scope
+      activeTasks: (tasks || []).slice(0, 30).map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        assigneeName: (users || []).find(u => (t.assigneeIds || []).includes(u.id))?.name || 'Unassigned',
+        dueDate: t.dueDate,
+        priority: t.priority,
+        subtasksCount: t.subtasks?.length || 0,
       })),
     };
+
+    // Extract conversation history for multi-turn grounded context
+    const conversationHistory = messages
+      .filter(m => m.text && m.text.trim().length > 0)
+      .slice(-8)
+      .map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        text: m.text,
+      }));
 
     let accumulatedText = '';
     const stagedActions: ActionCall[] = [];
@@ -265,6 +477,8 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         context: contextPayload,
         userRole: currentUser.role,
         orgSlug: currentOrgSlug,
+        sessionId: activeSessionId,
+        history: conversationHistory,
       },
       {
         onToken: (token: string) => {
@@ -277,16 +491,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         },
         onAction: (act: ActionCall) => {
           stagedActions.push(act);
-          const stepLabel =
-            act.tool === 'create_task'
-              ? `Created task "${act.parameters?.title || 'New Task'}"`
-              : act.tool === 'update_task'
-              ? `Updated task "${act.parameters?.title || act.parameters?.task_id || ''}"`
-              : act.tool === 'resolve_blocker'
-              ? `Resolved blocker for task`
-              : act.tool === 'reschedule_tasks'
-              ? `Rescheduled tasks`
-              : `Executed ${act.tool}`;
+          const stepLabel = formatActionLabel(act);
 
           timelineSteps.push({
             id: act.id,
@@ -309,6 +514,10 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
           );
         },
         onDone: async (meta) => {
+          if (meta.sessionId) {
+            setActiveSessionId(meta.sessionId);
+          }
+
           if (meta.status === 'requires_tools' && stagedActions.length > 0) {
             // Turn 1: Client Tool Execution Loop
             const toolResults: ToolExecutionResult[] = [];
@@ -337,11 +546,12 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
             typewriterCurrentRef.current = '';
             await aiService.streamChatMessage(
               {
-                sessionId: meta.sessionId,
+                sessionId: meta.sessionId || activeSessionId,
                 toolResults,
                 userRole: currentUser.role,
                 orgSlug: currentOrgSlug,
                 context: contextPayload,
+                history: conversationHistory,
               },
               {
                 onToken: (token: string) => {
@@ -353,6 +563,9 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                   };
                 },
                 onDone: (secondMeta) => {
+                  if (secondMeta.sessionId) {
+                    setActiveSessionId(secondMeta.sessionId);
+                  }
                   typewriterTargetRef.current = {
                     msgId: opsMsgId,
                     text: secondLegText,
@@ -524,7 +737,10 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                         key={chip.id}
                         chip={chip}
                         onToggleStatus={handleToggleTask}
-                        onOpenDetail={(id) => pushPanel({ type: 'task', id })}
+                        onOpenDetail={(id) => {
+                          pushPanel({ type: 'task', id });
+                          onClose();
+                        }}
                       />
                     ))}
                   </div>

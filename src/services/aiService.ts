@@ -60,6 +60,7 @@ export const aiService = {
     orgSlug?: string;
     authJwt?: string;
     toolResults?: any[];
+    history?: { role: string; text: string }[];
   }): Promise<ChatResponse> => {
     const res = await fetch(`${AGENT_API_URL}/api/chat`, {
       method: 'POST',
@@ -74,6 +75,7 @@ export const aiService = {
         orgSlug: params.orgSlug,
         authJwt: params.authJwt,
         toolResults: params.toolResults,
+        history: params.history,
       }),
     });
 
@@ -93,6 +95,7 @@ export const aiService = {
       orgSlug?: string;
       authJwt?: string;
       toolResults?: any[];
+      history?: { role: string; text: string }[];
     },
     callbacks: {
       onToken: (token: string) => void;
@@ -114,6 +117,7 @@ export const aiService = {
           orgSlug: params.orgSlug,
           authJwt: params.authJwt,
           toolResults: params.toolResults,
+          history: params.history,
         }),
       });
 

@@ -55,6 +55,14 @@ export const executeOpsTool = async (
         const dueDate = p.due_date || new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0];
         const priority = p.priority || 'Medium';
 
+        const subtasksList = Array.isArray(p.subtasks)
+          ? p.subtasks.map((st: any, idx: number) => ({
+              id: `st_${Date.now()}_${idx}`,
+              title: typeof st === 'string' ? st : st.title || 'Subtask',
+              done: false,
+            }))
+          : [];
+
         // Execute task creation through AppContext
         appContext.addTask({
           orgId: appContext.currentOrg?.id || '',
@@ -70,7 +78,7 @@ export const executeOpsTool = async (
           dueDate,
           tagIds: [],
           dependencyTaskIds: p.depends_on_task_ids || [],
-          subtasks: [],
+          subtasks: subtasksList,
           comments: [],
         });
 
@@ -79,7 +87,7 @@ export const executeOpsTool = async (
           status: 'success',
           wasNoOp: false,
           message: `Created task "${title}" in project "${projName}" with due date ${dueDate}.`,
-          data: { title, projectName: projName, dueDate },
+          data: { title, projectName: projName, dueDate, priority, subtasksCount: subtasksList.length },
         };
       }
 
@@ -198,14 +206,45 @@ export const executeOpsTool = async (
         };
       }
 
-      case 'query_team_state':
+      case 'query_team_state': {
+        const members = (appContext.users || []).map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          capacityHours: u.capacityHoursPerWeek || 40,
+        }));
+        const teams = (appContext.teams || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          memberCount: t.memberIds?.length || 0,
+        }));
+        return {
+          tool: 'query_team_state',
+          status: 'success',
+          wasNoOp: true,
+          message: `Team roster retrieved: ${members.length} members across ${teams.length} teams.`,
+          data: { members, teams },
+        };
+      }
+
+      case 'google_search': {
+        const query = p.query || '';
+        return {
+          tool: 'google_search',
+          status: 'success',
+          wasNoOp: true,
+          message: `Searched web for "${query}".`,
+          data: { query },
+        };
+      }
+
       case 'analyze_dependencies':
       case 'audit_sprint': {
         return {
           tool,
           status: 'success',
           wasNoOp: true,
-          message: 'Team state queried from client context.',
+          message: `${tool.replace(/_/g, ' ')} checked from client context.`,
         };
       }
 

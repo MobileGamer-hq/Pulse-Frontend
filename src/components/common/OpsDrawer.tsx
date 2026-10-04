@@ -1,21 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Bot, X, Send, CheckCircle2, RotateCcw, Layers
+  Bot, X, Send, RotateCcw, Layers,
+  ChevronDown, ChevronRight, Check, Loader2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { aiService, type DryRunDiff, type ActionCall } from '../../services/aiService';
-import { executeOpsTool } from '../../services/opsToolExecutor';
+import { executeOpsTool, type ToolExecutionResult } from '../../services/opsToolExecutor';
 import { DiffPreviewModal } from './DiffPreviewModal';
+
+interface ActionStep {
+  id: string;
+  tool: string;
+  label: string;
+  status: 'running' | 'success' | 'failed';
+  time: string;
+}
+
+interface ResultChip {
+  id: string;
+  title: string;
+  status: string;
+  dueDate?: string;
+  priority?: string;
+}
 
 interface Message {
   id: string;
   sender: 'user' | 'ops';
   text: string;
-  actions?: ActionCall[];
+  actionSteps?: ActionStep[];
+  resultChips?: ResultChip[];
   dryRunDiff?: DryRunDiff;
   undoToken?: string;
   timestamp: string;
+  isStreaming?: boolean;
 }
 
 interface OpsDrawerProps {
@@ -25,13 +44,13 @@ interface OpsDrawerProps {
 
 export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
   const appContext = useApp();
-  const { currentUser, currentOrgSlug, tasks } = appContext;
+  const { currentUser, currentOrgSlug, tasks, pushPanel, updateTask } = appContext;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       sender: 'ops',
-      text: "Ops operational manager ready. Deadlines, dependencies, blockers, and workloads monitored. How can I unblock the team?",
+      text: "Ops operational partner ready. What can I help unblock, schedule, or organize for the team today?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -58,6 +77,49 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Set-based deduplication for interactive result chips
+  const extractResultChips = (
+    actions: ActionCall[],
+    results: ToolExecutionResult[]
+  ): ResultChip[] => {
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    const chips: ResultChip[] = [];
+
+    for (let i = 0; i < actions.length; i++) {
+      const act = actions[i];
+      const res = results[i];
+      if (res && res.status === 'success') {
+        const title = res.data?.title || act.parameters?.title || '';
+        const taskId = res.data?.taskId || act.parameters?.task_id || '';
+
+        const matchedTask = tasks.find(
+          t => (taskId && t.id === taskId) || (title && t.title.toLowerCase() === title.toLowerCase())
+        );
+
+        const finalId = matchedTask?.id || taskId || `task_${Date.now()}`;
+        const finalTitle = matchedTask?.title || title || 'Task';
+        const normTitle = finalTitle.toLowerCase().trim();
+
+        if (finalId && seenIds.has(finalId)) continue;
+        if (normTitle && seenTitles.has(normTitle)) continue;
+
+        if (finalId) seenIds.add(finalId);
+        if (normTitle) seenTitles.add(normTitle);
+
+        chips.push({
+          id: finalId,
+          title: finalTitle,
+          status: matchedTask?.status || 'Todo',
+          dueDate: matchedTask?.dueDate || res.data?.dueDate || act.parameters?.due_date,
+          priority: matchedTask?.priority || act.parameters?.priority,
+        });
+      }
+    }
+
+    return chips;
+  };
+
   const handleSend = async (customText?: string) => {
     const messageText = (customText || input).trim();
     if (!messageText || isStreaming) return;
@@ -77,6 +139,8 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         id: opsMsgId,
         sender: 'ops',
         text: '',
+        isStreaming: true,
+        actionSteps: [],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -100,6 +164,7 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
 
     let accumulatedText = '';
     const stagedActions: ActionCall[] = [];
+    const timelineSteps: ActionStep[] = [];
 
     await aiService.streamChatMessage(
       {
@@ -117,8 +182,29 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         },
         onAction: (act: ActionCall) => {
           stagedActions.push(act);
+          const stepLabel =
+            act.tool === 'create_task'
+              ? `Created task "${act.parameters?.title || 'New Task'}"`
+              : act.tool === 'update_task'
+              ? `Updated task "${act.parameters?.title || act.parameters?.task_id || ''}"`
+              : act.tool === 'resolve_blocker'
+              ? `Resolved blocker for task`
+              : act.tool === 'reschedule_tasks'
+              ? `Rescheduled tasks`
+              : `Executed ${act.tool}`;
+
+          timelineSteps.push({
+            id: act.id,
+            tool: act.tool,
+            label: stepLabel,
+            status: 'running',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          });
+
           setMessages(prev =>
-            prev.map(m => (m.id === opsMsgId ? { ...m, actions: [...stagedActions] } : m))
+            prev.map(m =>
+              m.id === opsMsgId ? { ...m, actionSteps: [...timelineSteps] } : m
+            )
           );
         },
         onDryRun: (diff: DryRunDiff) => {
@@ -129,14 +215,29 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         },
         onDone: async (meta) => {
           if (meta.status === 'requires_tools' && stagedActions.length > 0) {
-            // Execute staged tool calls client-side against AppContext!
-            const toolResults = [];
-            for (const act of stagedActions) {
+            // Turn 1: Client Tool Execution Loop
+            const toolResults: ToolExecutionResult[] = [];
+            for (let i = 0; i < stagedActions.length; i++) {
+              const act = stagedActions[i];
               const res = await executeOpsTool(act, appContext);
               toolResults.push(res);
+              if (timelineSteps[i]) {
+                timelineSteps[i].status = res.status === 'success' ? 'success' : 'failed';
+              }
             }
 
-            // Immediately send tool execution results back to the backend for final grounded confirmation
+            // Extract deduplicated interactive result cards
+            const resultChips = extractResultChips(stagedActions, toolResults);
+
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === opsMsgId
+                  ? { ...m, actionSteps: [...timelineSteps], resultChips }
+                  : m
+              )
+            );
+
+            // Turn 2: Grounded confirmation
             let secondLegText = '';
             await aiService.streamChatMessage(
               {
@@ -157,9 +258,19 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                   if (secondMeta.undoToken) {
                     setActiveUndoToken(secondMeta.undoToken);
                   }
+                  setMessages(prev =>
+                    prev.map(m =>
+                      m.id === opsMsgId
+                        ? { ...m, isStreaming: false, undoToken: secondMeta.undoToken }
+                        : m
+                    )
+                  );
                   setIsStreaming(false);
                 },
                 onError: () => {
+                  setMessages(prev =>
+                    prev.map(m => (m.id === opsMsgId ? { ...m, isStreaming: false } : m))
+                  );
                   setIsStreaming(false);
                 },
               }
@@ -171,7 +282,11 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
             setActiveUndoToken(meta.undoToken);
           }
           setMessages(prev =>
-            prev.map(m => (m.id === opsMsgId ? { ...m, undoToken: meta.undoToken } : m))
+            prev.map(m =>
+              m.id === opsMsgId
+                ? { ...m, isStreaming: false, undoToken: meta.undoToken }
+                : m
+            )
           );
           setIsStreaming(false);
         },
@@ -180,13 +295,30 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
           setMessages(prev =>
             prev.map(m =>
               m.id === opsMsgId
-                ? { ...m, text: accumulatedText || "Connection interrupted. Please retry in a moment." }
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    text: accumulatedText || "Connection interrupted. Please retry in a moment.",
+                  }
                 : m
             )
           );
           setIsStreaming(false);
         },
       }
+    );
+  };
+
+  const handleToggleTask = (taskId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'Done' ? 'Todo' : 'Done';
+    updateTask(taskId, { status: nextStatus as any });
+    setMessages(prev =>
+      prev.map(m => ({
+        ...m,
+        resultChips: m.resultChips?.map(c =>
+          c.id === taskId ? { ...c, status: nextStatus } : c
+        ),
+      }))
     );
   };
 
@@ -225,11 +357,11 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
                   Ops
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  Operational Manager
+                  Operational Partner
                 </span>
               </div>
               <p className="text-[11px] text-neutral-500 font-mono">
-                Role: {currentUser.role} • Google GenAI Cascade
+                Role: {currentUser.role} • Client-Staged Execution
               </p>
             </div>
           </div>
@@ -269,25 +401,40 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
               className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[88%] p-3 rounded-2xl ${
+                className={`max-w-[90%] p-3.5 rounded-2xl ${
                   m.sender === 'user'
                     ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded-tr-xs'
                     : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-tl-xs border border-neutral-200/60 dark:border-neutral-700/60'
                 }`}
               >
-                <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                {/* Collapsible Action Timeline */}
+                {m.actionSteps && m.actionSteps.length > 0 && (
+                  <CollapsibleActionTimeline
+                    steps={m.actionSteps}
+                    isWorking={m.isStreaming}
+                  />
+                )}
 
-                {/* Staged Actions Badges */}
-                {m.actions && m.actions.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-neutral-200 dark:border-neutral-700 space-y-1">
-                    {m.actions.map((act) => (
-                      <div
-                        key={act.id}
-                        className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Executed: {act.tool}</span>
-                      </div>
+                {/* Message Text with Streaming Cursor (▊) */}
+                <p className="leading-relaxed whitespace-pre-wrap">
+                  {m.text}
+                  {m.isStreaming && (
+                    <span className="inline-block animate-pulse font-mono text-neutral-400 dark:text-neutral-500 font-bold ml-0.5">
+                      ▊
+                    </span>
+                  )}
+                </p>
+
+                {/* Interactive Result Chips Under Message */}
+                {m.resultChips && m.resultChips.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-neutral-200/80 dark:border-neutral-700/80 space-y-2">
+                    {m.resultChips.map(chip => (
+                      <InteractiveResultChip
+                        key={chip.id}
+                        chip={chip}
+                        onToggleStatus={handleToggleTask}
+                        onOpenDetail={(id) => pushPanel({ type: 'task', id })}
+                      />
                     ))}
                   </div>
                 )}
@@ -389,5 +536,103 @@ export const OpsDrawer: React.FC<OpsDrawerProps> = ({ isOpen, onClose }) => {
         />
       )}
     </>
+  );
+};
+
+// Collapsible Action Timeline Component
+const CollapsibleActionTimeline: React.FC<{
+  steps: ActionStep[];
+  isWorking?: boolean;
+}> = ({ steps, isWorking }) => {
+  const [isExpanded, setIsExpanded] = useState(isWorking ?? false);
+
+  if (!steps || steps.length === 0) return null;
+
+  return (
+    <div className="mb-2.5 font-mono text-[11px]">
+      <button
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer select-none"
+      >
+        <span>Actions ({steps.length})</span>
+        <ChevronDown
+          className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {isExpanded && (
+        <div className="mt-1.5 pl-3 ml-2 border-l border-neutral-300 dark:border-neutral-700 space-y-2">
+          {steps.map((step, idx) => (
+            <div key={step.id || idx} className="relative flex items-start gap-2">
+              <div className="mt-0.5 -ml-[17px] p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                {step.status === 'running' ? (
+                  <Loader2 className="w-2.5 h-2.5 animate-spin text-neutral-400" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 flex items-baseline justify-between gap-2">
+                <span className="text-neutral-500 dark:text-neutral-400 truncate">
+                  {step.label}
+                </span>
+                <span className="text-[10px] text-neutral-400 shrink-0">{step.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Interactive Result Chip Component
+const InteractiveResultChip: React.FC<{
+  chip: ResultChip;
+  onToggleStatus: (id: string, currentStatus: string) => void;
+  onOpenDetail: (id: string) => void;
+}> = ({ chip, onToggleStatus, onOpenDetail }) => {
+  const isDone = chip.status === 'Done';
+
+  return (
+    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all shadow-2xs group">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleStatus(chip.id, chip.status);
+        }}
+        className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+          isDone
+            ? 'bg-emerald-500 border-emerald-500 text-white'
+            : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-500'
+        }`}
+        title={isDone ? 'Mark as Todo' : 'Mark as Done'}
+      >
+        {isDone && <Check className="w-2.5 h-2.5" />}
+      </button>
+
+      <div
+        onClick={() => onOpenDetail(chip.id)}
+        className="flex-1 min-w-0 flex items-center justify-between gap-2 cursor-pointer"
+      >
+        <span
+          className={`text-xs font-semibold truncate ${
+            isDone
+              ? 'line-through text-neutral-400 dark:text-neutral-500'
+              : 'text-neutral-800 dark:text-neutral-200'
+          }`}
+        >
+          {chip.title}
+        </span>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {chip.dueDate && (
+            <span className="text-[10px] font-mono text-neutral-400 px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">
+              {chip.dueDate}
+            </span>
+          )}
+          <ChevronRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors" />
+        </div>
+      </div>
+    </div>
   );
 };
